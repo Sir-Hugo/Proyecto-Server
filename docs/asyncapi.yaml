@@ -1,0 +1,1050 @@
+asyncapi: 3.0.0
+info:
+  title: Game Server real-time protocol
+  version: 1.0.0
+  description: >-
+    Real-time contract for the game server. Payloads are application-level
+    messages carried through the authenticated SignalR hub. Every payload has a
+    type and a separate numeric version. Match events are recipient-specific;
+    resolved-round messages disclose outcomes but never the opponent's action list.
+    SignalR invocation failures are returned as HubException error strings; the
+    operation's x-signalr-invocation-errors extension lists their current values.
+defaultContentType: application/json
+servers:
+  local:
+    host: localhost:3000
+    pathname: /hubs/game
+    protocol: wss
+    description: Local ASP.NET Core server using its development HTTPS certificate.
+    security:
+      - bearerAuth: []
+channels:
+  gameHub:
+    address: /hubs/game
+    title: Authenticated game hub
+    description: >-
+      SignalR hub. A client first negotiates a connection and then invokes hub
+      methods or receives named events. The message payloads below describe the
+      application data inside SignalR, not SignalR's framing protocol. The server
+      rejects incoming hub messages larger than 8192 bytes (8 KiB).
+    x-signalr-maximum-receive-message-size: 8192
+    messages:
+      submitRoundPlan:
+        $ref: '#/components/messages/SubmitRoundPlan'
+      syncMatchState:
+        $ref: '#/components/messages/SyncMatchState'
+      joinMatchmakingQueue:
+        $ref: '#/components/messages/JoinMatchmakingQueue'
+      cancelMatchmakingQueue:
+        $ref: '#/components/messages/CancelMatchmakingQueue'
+      setMatchNickname:
+        $ref: '#/components/messages/SetMatchNickname'
+      joinMatch:
+        $ref: '#/components/messages/JoinMatch'
+      joinRoom:
+        $ref: '#/components/messages/JoinRoom'
+      leaveRoom:
+        $ref: '#/components/messages/LeaveRoom'
+      roundPlanAccepted:
+        $ref: '#/components/messages/RoundPlanAccepted'
+      matchStateSnapshot:
+        $ref: '#/components/messages/MatchStateSnapshot'
+      roundResolved:
+        $ref: '#/components/messages/RoundResolved'
+      matchStarted:
+        $ref: '#/components/messages/MatchStarted'
+      matchEnded:
+        $ref: '#/components/messages/MatchEnded'
+      playerConnectionChanged:
+        $ref: '#/components/messages/PlayerConnectionChanged'
+      matchmakingStatus:
+        $ref: '#/components/messages/MatchmakingStatus'
+      matchFound:
+        $ref: '#/components/messages/MatchFound'
+      roomMemberChanged:
+        $ref: '#/components/messages/RoomMemberChanged'
+      roomReadyChanged:
+        $ref: '#/components/messages/RoomReadyChanged'
+      roomMatchStarted:
+        $ref: '#/components/messages/RoomMatchStarted'
+operations:
+  submitRoundPlan:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/submitRoundPlan'
+    summary: Submit all actions for the current simultaneous round.
+    x-signalr-invocation-errors:
+      - invalid_message
+      - not_match_participant
+      - match_completed
+      - nicknames_required
+      - stale_sequence
+      - round_plan_already_submitted
+      - invalid_round_plan
+      - idempotency_key_reused
+  syncMatchState:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/syncMatchState'
+    summary: Planned: request the current player-specific match snapshot after reconnecting.
+    x-implementation-status: planned; current clients call JoinMatch instead.
+  joinMatchmakingQueue:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/joinMatchmakingQueue'
+    summary: Join the quick-match queue.
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required]
+  cancelMatchmakingQueue:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/cancelMatchmakingQueue'
+    summary: Leave the quick-match queue.
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required]
+  setMatchNickname:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/setMatchNickname'
+    summary: Set the participant's temporary nickname before the first round.
+    x-signalr-invocation-errors:
+      - invalid_message
+      - not_match_participant
+      - match_completed
+      - invalid_nickname
+      - nickname_already_set
+  joinMatch:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/joinMatch'
+    summary: Join the match and receive a player-specific state snapshot.
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, not_match_participant]
+  joinRoom:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/joinRoom'
+    summary: Subscribe to start notifications for a room the caller belongs to.
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, room_membership_required]
+  leaveRoom:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/leaveRoom'
+    summary: Leave the room's SignalR notification group.
+    x-signalr-invocation-errors: [invalid_message]
+  sendRoundPlanAccepted:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/roundPlanAccepted'
+    summary: Confirm receipt of the requesting player's plan without revealing the opponent's plan.
+  sendMatchStateSnapshot:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/matchStateSnapshot'
+    summary: Send only the state visible to the requesting player.
+  sendRoundResolved:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/roundResolved'
+    summary: Send the resolved round outcomes without either player's action list.
+  sendMatchStarted:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/matchStarted'
+    summary: Notify participants that a match has started.
+  sendMatchEnded:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/matchEnded'
+    summary: Notify participants of the final result.
+  sendPlayerConnectionChanged:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/playerConnectionChanged'
+    summary: Planned: notify the other participant about a disconnect or reconnection.
+    x-implementation-status: planned
+  sendMatchmakingStatus:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/matchmakingStatus'
+    summary: Report queue status privately to the requesting player.
+  sendMatchFound:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/matchFound'
+    summary: Notify a player that quick matchmaking found a match.
+  sendRoomMemberChanged:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/roomMemberChanged'
+    summary: Planned: notify room participants that a member joined or left.
+    x-implementation-status: planned
+  sendRoomReadyChanged:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/roomReadyChanged'
+    summary: Planned: notify room participants when a member changes ready state.
+    x-implementation-status: planned
+  sendRoomMatchStarted:
+    action: send
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/roomMatchStarted'
+    summary: Notify both members of a room when their match is ready.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Auth0 access token whose audience is the game server API identifier.
+  schemas:
+    Envelope:
+      type: object
+      required: [type, version]
+      properties:
+        type:
+          type: string
+          description: Stable message name; the version is carried separately.
+        version:
+          type: integer
+          enum: [1]
+          description: Version of this message schema.
+    RequestEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [requestId]
+          properties:
+            requestId:
+              type: string
+              format: uuid
+              description: Client-generated command identifier; idempotency depends on the specific command.
+    SubmitRoundPlan:
+      allOf:
+        - $ref: '#/components/schemas/RequestEnvelope'
+        - type: object
+          required: [type, version, matchId, expectedSequence, actions]
+          properties:
+            type:
+              type: string
+              enum: [round.plan.submit]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            expectedSequence:
+              type: integer
+              minimum: 0
+            actions:
+              type: array
+              minItems: 1
+              maxItems: 19
+              items:
+                type: string
+                enum: [Attack, Block, Reserve, SpecialAttack]
+              description: The player's complete action plan. Never broadcast to the opponent.
+    SyncMatchState:
+      allOf:
+        - $ref: '#/components/schemas/RequestEnvelope'
+        - type: object
+          required: [type, version, matchId, lastSeenSequence]
+          properties:
+            type:
+              type: string
+              enum: [match.state.sync]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            lastSeenSequence:
+              type: integer
+              minimum: 0
+    JoinMatchmakingQueue:
+      allOf:
+        - $ref: '#/components/schemas/RequestEnvelope'
+        - type: object
+          required: [type, version]
+          properties:
+            type:
+              type: string
+              enum: [matchmaking.queue.join]
+            version:
+              type: integer
+              enum: [1]
+    CancelMatchmakingQueue:
+      allOf:
+        - $ref: '#/components/schemas/RequestEnvelope'
+        - type: object
+          required: [type, version]
+          properties:
+            type:
+              type: string
+              enum: [matchmaking.queue.cancel]
+            version:
+              type: integer
+              enum: [1]
+    SetMatchNickname:
+      allOf:
+        - $ref: '#/components/schemas/RequestEnvelope'
+        - type: object
+          required: [type, version, matchId, nickname]
+          properties:
+            type:
+              type: string
+              enum: [match.nickname.set]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            nickname:
+              type: string
+              minLength: 1
+              maxLength: 10
+              pattern: '^[\p{L}\p{N}_-]+$'
+              description: Temporary match-only name; letters, numbers, underscore, or hyphen.
+    JoinMatch:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId]
+          properties:
+            type: { type: string, enum: [match.join] }
+            version: { type: integer, enum: [1] }
+            matchId: { type: string, format: uuid }
+    JoinRoom:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, roomId]
+          properties:
+            type: { type: string, enum: [room.join] }
+            version: { type: integer, enum: [1] }
+            roomId: { type: string, format: uuid }
+    LeaveRoom:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, roomId]
+          properties:
+            type: { type: string, enum: [room.leave] }
+            version: { type: integer, enum: [1] }
+            roomId: { type: string, format: uuid }
+    RoundPlanAccepted:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, requestId, matchId, sequence]
+          properties:
+            type:
+              type: string
+              enum: [round.plan.accepted]
+            version:
+              type: integer
+              enum: [1]
+            requestId:
+              type: string
+              format: uuid
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+    PlayerMatchView:
+      type: object
+      required: [playerId, health, nickname, isHost]
+      properties:
+        playerId:
+          type: string
+          format: uuid
+          description: Opaque game player identifier; never an Auth0 subject or email.
+        nickname:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 10
+          description: Null until the participant chooses a nickname; private to the match.
+        isHost:
+          type: boolean
+          description: True for the first match seat; determines the host/guest character artwork.
+        health:
+          type: integer
+          minimum: 0
+          maximum: 50
+        energy:
+          type: integer
+          minimum: 0
+          description: Included only for the requesting player.
+        usedBlockades:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: Included only for the requesting player.
+        hasUsedSpecialAttack:
+          type: boolean
+          description: Included only for the requesting player.
+    MatchStateSnapshot:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, sequence, roundNumber, status, you, opponent]
+          properties:
+            type:
+              type: string
+              enum: [match.state.snapshot]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+            roundNumber:
+              type: integer
+              minimum: 1
+              maximum: 10
+            status:
+              type: string
+              enum: [waitingForNicknames, active, completed]
+            you:
+              $ref: '#/components/schemas/PlayerMatchView'
+            opponent:
+              type: object
+              required: [playerId, health, nickname, isHost]
+              properties:
+                playerId:
+                  type: string
+                  format: uuid
+                nickname:
+                  type: [string, 'null']
+                  maxLength: 10
+                isHost:
+                  type: boolean
+                health:
+                  type: integer
+                  minimum: 0
+                  maximum: 50
+    RoundResolved:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, sequence, roundNumber, yourDamage, opponentDamage, yourCriticalHits, opponentCriticalHits, yourAttacksBlocked, opponentAttacksBlocked, status, you, opponent]
+          properties:
+            type:
+              type: string
+              enum: [round.resolved]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+            roundNumber:
+              type: integer
+              minimum: 1
+              maximum: 10
+              description: The round whose actions were resolved; the state may already be ready for the next round.
+            yourDamage:
+              type: integer
+              minimum: 0
+            opponentDamage:
+              type: integer
+              minimum: 0
+            yourCriticalHits:
+              type: integer
+              minimum: 0
+            opponentCriticalHits:
+              type: integer
+              minimum: 0
+            yourAttacksBlocked:
+              type: integer
+              minimum: 0
+            opponentAttacksBlocked:
+              type: integer
+              minimum: 0
+            status:
+              type: string
+              enum: [active, completed]
+            winnerId:
+              type: [string, 'null']
+              format: uuid
+            you:
+              $ref: '#/components/schemas/PlayerMatchView'
+            opponent:
+              type: object
+              required: [playerId, health, nickname, isHost]
+              properties:
+                playerId:
+                  type: string
+                  format: uuid
+                nickname:
+                  type: [string, 'null']
+                  maxLength: 10
+                isHost:
+                  type: boolean
+                health:
+                  type: integer
+                  minimum: 0
+                  maximum: 50
+          description: Contains outcomes only; never include action names, counts, or the opponent's submitted plan.
+    MatchStarted:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, sequence, roundNumber, playerIds]
+          properties:
+            type:
+              type: string
+              enum: [match.started]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+            roundNumber:
+              type: integer
+              enum: [1]
+            playerIds:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+                format: uuid
+    MatchEnded:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, sequence, roundNumber, reason, status, winnerId, you, opponent]
+          properties:
+            type:
+              type: string
+              enum: [match.ended]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+            roundNumber:
+              type: integer
+              minimum: 1
+              maximum: 10
+            status:
+              type: string
+              enum: [completed]
+            winnerId:
+              type: [string, 'null']
+              format: uuid
+            reason:
+              type: string
+              enum: [inactivity]
+              description: The round inactivity deadline expired before the match ended normally.
+            you:
+              $ref: '#/components/schemas/PlayerMatchView'
+            opponent:
+              type: object
+              required: [playerId, health, nickname, isHost]
+              properties:
+                playerId:
+                  type: string
+                  format: uuid
+                nickname:
+                  type: [string, 'null']
+                  maxLength: 10
+                isHost:
+                  type: boolean
+                health:
+                  type: integer
+                  minimum: 0
+                  maximum: 50
+    PlayerConnectionChanged:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, sequence, playerId, state]
+          properties:
+            type:
+              type: string
+              enum: [player.connection.changed]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            sequence:
+              type: integer
+              minimum: 0
+            playerId:
+              type: string
+              format: uuid
+            state:
+              type: string
+              enum: [disconnected, reconnected]
+    MatchmakingStatus:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, requestId, status]
+          properties:
+            type:
+              type: string
+              enum: [matchmaking.status]
+            version:
+              type: integer
+              enum: [1]
+            requestId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [queued, cancelled, timedOut]
+            queuedAt:
+              type: string
+              format: date-time
+    MatchFound:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, matchId, playerIds]
+          properties:
+            type:
+              type: string
+              enum: [match.found]
+            version:
+              type: integer
+              enum: [1]
+            matchId:
+              type: string
+              format: uuid
+            playerIds:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+                format: uuid
+    RoomMemberChanged:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, roomId, playerId, change]
+          properties:
+            type:
+              type: string
+              enum: [room.member.changed]
+            version:
+              type: integer
+              enum: [1]
+            roomId:
+              type: string
+              format: uuid
+            playerId:
+              type: string
+              format: uuid
+            change:
+              type: string
+              enum: [joined, left]
+    RoomReadyChanged:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, roomId, playerId, isReady]
+          properties:
+            type:
+              type: string
+              enum: [room.ready.changed]
+            version:
+              type: integer
+              enum: [1]
+            roomId:
+              type: string
+              format: uuid
+            playerId:
+              type: string
+              format: uuid
+            isReady:
+              type: boolean
+    RoomMatchStarted:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          required: [type, version, roomId, matchId]
+          properties:
+            type:
+              type: string
+              enum: [room.match.started]
+            version:
+              type: integer
+              enum: [1]
+            roomId:
+              type: string
+              format: uuid
+            matchId:
+              type: string
+              format: uuid
+  messages:
+    SubmitRoundPlan:
+      name: round.plan.submit
+      title: Submit round plan
+      summary: Submit the player's complete action plan for the current round.
+      description: The server validates and stores this privately until both plans are available.
+      payload:
+        $ref: '#/components/schemas/SubmitRoundPlan'
+      examples:
+        - name: basicPlan
+          payload:
+            type: round.plan.submit
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508011
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            expectedSequence: 4
+            actions: [Attack]
+    SyncMatchState:
+      name: match.state.sync
+      title: Synchronize match state
+      description: Planned message; the current implementation uses the JoinMatch hub method.
+      x-implementation-status: planned
+      payload:
+        $ref: '#/components/schemas/SyncMatchState'
+      examples:
+        - name: resumeMatch
+          payload:
+            type: match.state.sync
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508012
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            lastSeenSequence: 4
+    JoinMatchmakingQueue:
+      name: matchmaking.queue.join
+      title: Join quick-match queue
+      payload:
+        $ref: '#/components/schemas/JoinMatchmakingQueue'
+      examples:
+        - name: joinQueue
+          payload:
+            type: matchmaking.queue.join
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508013
+    CancelMatchmakingQueue:
+      name: matchmaking.queue.cancel
+      title: Cancel quick-match queue request
+      payload:
+        $ref: '#/components/schemas/CancelMatchmakingQueue'
+      examples:
+        - name: cancelQueue
+          payload:
+            type: matchmaking.queue.cancel
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508014
+    RoundPlanAccepted:
+      name: round.plan.accepted
+      title: Round plan accepted
+      payload:
+        $ref: '#/components/schemas/RoundPlanAccepted'
+      examples:
+        - name: accepted
+          payload:
+            type: round.plan.accepted
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508011
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 5
+    MatchStateSnapshot:
+      name: match.state.snapshot
+      title: Player-specific match snapshot
+      payload:
+        $ref: '#/components/schemas/MatchStateSnapshot'
+      examples:
+        - name: activeMatch
+          payload:
+            type: match.state.snapshot
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 5
+            roundNumber: 3
+            status: active
+            you:
+              playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
+              isHost: true
+              nickname: Caballero_1
+              health: 45
+              energy: 2
+              usedBlockades: 1
+              hasUsedSpecialAttack: false
+            opponent:
+              playerId: b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+              isHost: false
+              nickname: Lobo-2
+              health: 40
+    RoundResolved:
+      name: round.resolved
+      title: Round outcome
+      description: Does not disclose either submitted action list.
+      payload:
+        $ref: '#/components/schemas/RoundResolved'
+      examples:
+        - name: resolvedRound
+          payload:
+            type: round.resolved
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 6
+            roundNumber: 3
+            yourDamage: 5
+            opponentDamage: 10
+            yourCriticalHits: 0
+            opponentCriticalHits: 0
+            yourAttacksBlocked: 0
+            opponentAttacksBlocked: 1
+            status: active
+            winnerId: null
+            you:
+              playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
+              isHost: true
+              nickname: Caballero_1
+              health: 40
+              energy: 2
+              usedBlockades: 1
+              hasUsedSpecialAttack: false
+            opponent:
+              playerId: b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+              isHost: false
+              nickname: Lobo-2
+              health: 35
+    MatchStarted:
+      name: match.started
+      title: Match started
+      payload:
+        $ref: '#/components/schemas/MatchStarted'
+      examples:
+        - name: start
+          payload:
+            type: match.started
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 1
+            roundNumber: 1
+            playerIds:
+              - ffa0a0f1-25e3-4811-9003-9d20560c179e
+              - b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+    MatchEnded:
+      name: match.ended
+      title: Match ended
+      payload:
+        $ref: '#/components/schemas/MatchEnded'
+      examples:
+        - name: inactivityDraw
+          payload:
+            type: match.ended
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 19
+            roundNumber: 4
+            reason: inactivity
+            status: completed
+            winnerId: null
+            you:
+              playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
+              isHost: true
+              nickname: Caballero_1
+              health: 40
+              energy: 0
+              usedBlockades: 1
+              hasUsedSpecialAttack: false
+            opponent:
+              playerId: b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+              isHost: false
+              nickname: Lobo-2
+              health: 35
+    PlayerConnectionChanged:
+      name: player.connection.changed
+      title: Participant connection state changed
+      description: Planned event; automatic reconnect currently rejoins and fetches a snapshot without notifying the opponent.
+      x-implementation-status: planned
+      payload:
+        $ref: '#/components/schemas/PlayerConnectionChanged'
+      examples:
+        - name: opponentDisconnected
+          payload:
+            type: player.connection.changed
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            sequence: 7
+            playerId: b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+            state: disconnected
+    MatchmakingStatus:
+      name: matchmaking.status
+      title: Matchmaking status
+      payload:
+        $ref: '#/components/schemas/MatchmakingStatus'
+      examples:
+        - name: queued
+          payload:
+            type: matchmaking.status
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508013
+            status: queued
+            queuedAt: '2026-11-07T18:30:00Z'
+        - name: waitExpired
+          payload:
+            type: matchmaking.status
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508013
+            status: timedOut
+            queuedAt: '2026-11-07T18:30:00Z'
+    MatchFound:
+      name: match.found
+      title: Match found
+      payload:
+        $ref: '#/components/schemas/MatchFound'
+      examples:
+        - name: found
+          payload:
+            type: match.found
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            playerIds:
+              - ffa0a0f1-25e3-4811-9003-9d20560c179e
+              - b02ac2ab-07b3-4aed-84b5-e3a8c1c6b226
+    RoomMemberChanged:
+      name: room.member.changed
+      title: Room member changed
+      x-implementation-status: planned
+      payload:
+        $ref: '#/components/schemas/RoomMemberChanged'
+      examples:
+        - name: playerJoined
+          payload:
+            type: room.member.changed
+            version: 1
+            roomId: 013629dc-273c-427d-9e1d-862cb41e9124
+            playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
+            change: joined
+    RoomReadyChanged:
+      name: room.ready.changed
+      title: Room readiness changed
+      x-implementation-status: planned
+      payload:
+        $ref: '#/components/schemas/RoomReadyChanged'
+      examples:
+        - name: playerReady
+          payload:
+            type: room.ready.changed
+            version: 1
+            roomId: 013629dc-273c-427d-9e1d-862cb41e9124
+            playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
+            isReady: true
+    SetMatchNickname:
+      name: match.nickname.set
+      title: Set match nickname
+      description: Set a temporary nickname before the first round. Both players must choose one before play begins.
+      payload:
+        $ref: '#/components/schemas/SetMatchNickname'
+      examples:
+        - name: chooseNickname
+          payload:
+            type: match.nickname.set
+            version: 1
+            requestId: 740fbb08-81bf-4f6c-9f30-193975508018
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+            nickname: Caballero_1
+    JoinMatch:
+      name: match.join
+      title: Join match
+      payload:
+        $ref: '#/components/schemas/JoinMatch'
+      examples:
+        - name: joinCreatedMatch
+          payload:
+            type: match.join
+            version: 1
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
+    JoinRoom:
+      name: room.join
+      title: Subscribe to room events
+      payload:
+        $ref: '#/components/schemas/JoinRoom'
+      examples:
+        - name: subscribeToRoom
+          payload:
+            type: room.join
+            version: 1
+            roomId: 013629dc-273c-427d-9e1d-862cb41e9124
+    LeaveRoom:
+      name: room.leave
+      title: Leave room event group
+      payload:
+        $ref: '#/components/schemas/LeaveRoom'
+      examples:
+        - name: unsubscribeFromRoom
+          payload:
+            type: room.leave
+            version: 1
+            roomId: 013629dc-273c-427d-9e1d-862cb41e9124
+    RoomMatchStarted:
+      name: room.match.started
+      title: Room match started
+      description: Sent to both authenticated room members when both players are ready.
+      payload:
+        $ref: '#/components/schemas/RoomMatchStarted'
+      examples:
+        - name: readyRoom
+          payload:
+            type: room.match.started
+            version: 1
+            roomId: 013629dc-273c-427d-9e1d-862cb41e9124
+            matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
