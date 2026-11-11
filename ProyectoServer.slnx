@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Game.Domain/Game.Domain.csproj" />
+    <Project Path="src/Game.Infrastructure/Game.Infrastructure.csproj" />
+    <Project Path="src/Game.Server/Game.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Game.Domain.Tests/Game.Domain.Tests.csproj" />
+    <Project Path="tests/Game.Postgres.Tests/Game.Postgres.Tests.csproj" />
+    <Project Path="tests/Game.Server.Tests/Game.Server.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Game.Database/Game.Database.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,98 @@
+name: CD (disabled until configured)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, prod]
+        default: dev
+      deploy:
+        description: Confirm that Azure configuration and approvals are ready
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'push' && vars.AZURE_DEPLOY_ENABLED == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy && vars.AZURE_DEPLOY_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    env:
+      DEPLOY_ENV: ${{ github.event.inputs.environment || 'dev' }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate required deployment variables
+        shell: bash
+        run: |
+          required=(RESOURCE_GROUP AZURE_LOCATION NAME_PREFIX ACR_NAME CONTAINER_APP_NAME MIGRATION_JOB_NAME AUTH0_AUTHORITY AUTH0_AUDIENCE AUTH0_CLIENT_ID)
+          for name in "${required[@]}"; do test -n "${!name:-}" || { echo "Missing GitHub environment variable: $name"; exit 1; }; done
+        env:
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          NAME_PREFIX: ${{ vars.NAME_PREFIX }}
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+          MIGRATION_JOB_NAME: ${{ vars.MIGRATION_JOB_NAME }}
+          AUTH0_AUTHORITY: ${{ vars.AUTH0_AUTHORITY }}
+          AUTH0_AUDIENCE: ${{ vars.AUTH0_AUDIENCE }}
+          AUTH0_CLIENT_ID: ${{ vars.AUTH0_CLIENT_ID }}
+      - name: Validate Bicep against Azure
+        run: >-
+          az deployment group validate --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
+          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
+          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
+          deployData=false deployApplication=false
+      - name: Build and publish immutable image
+        run: |
+          az acr login --name '${{ vars.ACR_NAME }}'
+          docker build --pull --tag '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG" .
+          docker push '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG"
+      - name: Apply shared infrastructure without changing application revision
+        run: >-
+          az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
+          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
+          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
+          imageTag="$IMAGE_TAG" deployData=false deployApplication=false
+      - name: Run one controlled migration job
+        shell: bash
+        run: |
+          az containerapp job update --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --image '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG"
+          execution=$(az containerapp job start --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --query name -o tsv)
+          for _ in {1..90}; do
+            status=$(az containerapp job execution show --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --job-execution-name "$execution" --query properties.status -o tsv)
+            case "$status" in Succeeded) break ;; Failed) echo "Migration failed"; exit 1 ;; esac
+            sleep 10
+          done
+          test "$status" = Succeeded
+      - name: Deploy the commit image
+        run: >-
+          az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
+          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
+          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
+          imageTag="$IMAGE_TAG" deployData=false deployApplication=true
+      - name: Verify readiness and record deployed revision
+        shell: bash
+        run: |
+          fqdn=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name '${{ vars.CONTAINER_APP_NAME }}' --query properties.configuration.ingress.fqdn -o tsv)
+          for _ in {1..30}; do curl --fail --silent --show-error "https://$fqdn/health/ready" && break; sleep 10; done
+          curl --fail --silent --show-error "https://$fqdn/health/ready"
+          az containerapp revision list --resource-group "$RESOURCE_GROUP" --name '${{ vars.CONTAINER_APP_NAME }}' --query "[?properties.active].{revision:name,image:properties.template.containers[0].image,created:properties.createdTime}" -o table

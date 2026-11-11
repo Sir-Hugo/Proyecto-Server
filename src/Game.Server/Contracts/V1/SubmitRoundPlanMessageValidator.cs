@@ -60,7 +60,8 @@ public static class SubmitRoundPlanMessageValidator
             {
                 string? actionName = message.Actions[index];
                 if (!Enum.TryParse(actionName, ignoreCase: false, out GameAction action) ||
-                    !Enum.IsDefined(action))
+                    !Enum.IsDefined(action) ||
+                    !string.Equals(actionName, action.ToString(), StringComparison.Ordinal))
                 {
                     issues.Add(new MessageValidationIssue("unknown_action", $"actions[{index}]"));
                     continue;

@@ -49,14 +49,14 @@ public static class RoomEndpoints
         .WithName("ListPublicRooms")
         .WithSummary("Lista las salas públicas que todavía admiten jugadores.");
 
-        rooms.MapGet("/{roomId:guid}", (Guid roomId, ClaimsPrincipal user, InMemoryRoomService service) =>
+        rooms.MapGet("/{roomId:guid}", async (Guid roomId, ClaimsPrincipal user, InMemoryRoomService service, CancellationToken cancellationToken) =>
         {
             if (!TryGetHumanSubject(user, out string subject))
             {
                 return HumanIdentityRequired();
             }
 
-            RoomOperationResult<RoomResponse> result = service.Get(roomId, subject);
+            RoomOperationResult<RoomResponse> result = await service.GetAsync(roomId, subject, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Failure(result.ErrorStatusCode!.Value, result.ErrorCode!);
@@ -65,7 +65,7 @@ public static class RoomEndpoints
         .WithSummary("Obtiene una sala pública o una sala privada de la que el usuario es miembro.");
 
         rooms.MapPost("/{roomId:guid}/join", (Guid roomId, JoinRoomRequest? request, ClaimsPrincipal user,
-            InMemoryRoomService service) =>
+            InMemoryRoomService service, CancellationToken cancellationToken) =>
         {
             if (!TryGetHumanSubject(user, out string subject))
             {
@@ -85,15 +85,15 @@ public static class RoomEndpoints
         .WithName("JoinRoom")
         .WithSummary("Se une a una sala; las privadas requieren su código de invitación.");
 
-        rooms.MapDelete("/{roomId:guid}/membership", (Guid roomId, ClaimsPrincipal user,
-            InMemoryRoomService service) =>
+        rooms.MapDelete("/{roomId:guid}/membership", async (Guid roomId, ClaimsPrincipal user,
+            InMemoryRoomService service, CancellationToken cancellationToken) =>
         {
             if (!TryGetHumanSubject(user, out string subject))
             {
                 return HumanIdentityRequired();
             }
 
-            RoomOperationResult<LeaveRoomResponse> result = service.Leave(roomId, subject);
+            RoomOperationResult<LeaveRoomResponse> result = await service.LeaveAsync(roomId, subject, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
                 : Failure(result.ErrorStatusCode!.Value, result.ErrorCode!);
@@ -102,7 +102,7 @@ public static class RoomEndpoints
         .WithSummary("Sale de una sala; si sale quien la creó, la sala se cierra.");
 
         rooms.MapPut("/{roomId:guid}/ready", async (Guid roomId, SetRoomReadyRequest? request, ClaimsPrincipal user,
-            InMemoryRoomService service, IHubContext<GameHub> hub) =>
+            InMemoryRoomService service, IHubContext<GameHub> hub, ILogger<InMemoryRoomService> logger, CancellationToken cancellationToken) =>
         {
             if (!TryGetHumanSubject(user, out string subject))
             {
@@ -114,16 +114,22 @@ public static class RoomEndpoints
                 return Failure(StatusCodes.Status400BadRequest, "request_required");
             }
 
-            RoomOperationResult<RoomResponse> result = service.SetReady(roomId, subject, request.IsReady);
+            RoomOperationResult<RoomResponse> result = await service.SetReadyAsync(roomId, subject, request.IsReady, cancellationToken);
             if (!result.IsSuccess)
                 return Failure(result.ErrorStatusCode!.Value, result.ErrorCode!);
 
             if (result.Value!.MatchId is Guid matchId)
             {
-                await hub.Clients.Group($"room:{roomId}").SendAsync("room.match.started", new
+                try
                 {
-                    type = "room.match.started", version = 1, roomId, matchId
-                });
+                    await hub.Clients.Group($"room:{roomId}").SendAsync("room.match.started", new
+                    { type = "room.match.started", version = 1, roomId, matchId });
+                }
+                catch (Exception)
+                {
+                    // Already committed: GET room / JoinMatch can recover the matchId and snapshot.
+                    logger.LogWarning("SignalR room start delivery failed after commit for match {MatchId}", matchId);
+                }
             }
 
             return Results.Ok(result.Value);

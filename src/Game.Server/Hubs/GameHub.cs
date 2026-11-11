@@ -12,8 +12,13 @@ namespace Game.Server.Hubs;
 /// Las conexiones requieren un JWT válido.
 /// </summary>
 [Authorize]
-public sealed class GameHub : Hub
+public sealed class GameHub(MatchRoundService connectionTracker) : Hub
 {
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        connectionTracker.DetachConnection(Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
+    }
     public async Task JoinRoom(JoinRoomMessage message, InMemoryRoomService rooms)
     {
         ValidateSimpleMessage(message.Type, message.Version, JoinRoomMessage.MessageType, message.RoomId);
@@ -33,44 +38,49 @@ public sealed class GameHub : Hub
     {
         ValidateQueueMessage(message.Type, message.Version, "matchmaking.queue.join");
         string subject = GetHumanSubject();
-        return matchmaking.JoinAsync(subject, Context.ConnectionId, message.RequestId);
+        return matchmaking.JoinAsync(subject, Context.ConnectionId, message.RequestId, Context.ConnectionAborted);
     }
 
     public Task CancelMatchmakingQueue(CancelMatchmakingQueueMessage message, MatchmakingService matchmaking)
     {
         ValidateQueueMessage(message.Type, message.Version, "matchmaking.queue.cancel");
         string subject = GetHumanSubject();
-        return matchmaking.CancelAsync(subject, message.RequestId);
+        return matchmaking.CancelAsync(subject, message.RequestId, Context.ConnectionAborted);
     }
 
-    public async Task JoinMatch(JoinMatchMessage message, InMemoryRoomService rooms, MatchmakingService matchmaking, MatchRoundService rounds)
+    public async Task JoinMatch(JoinMatchMessage message, MatchRoundService rounds)
     {
         ValidateSimpleMessage(message.Type, message.Version, JoinMatchMessage.MessageType, message.MatchId);
-        Guid matchId = message.MatchId;
-        string subject = GetHumanSubject();
-        MatchState? match;
-        Guid playerId;
-        if (!rooms.TryGetMatchParticipant(matchId, subject, out match, out playerId) &&
-            !matchmaking.TryGetMatchParticipant(matchId, subject, out match, out playerId))
-        {
-            throw new HubException("not_match_participant");
-        }
+        object snapshot = await rounds.AttachAsync(message.MatchId, GetHumanSubject(), Context.ConnectionId, Context.ConnectionAborted);
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"match:{message.MatchId}", Context.ConnectionAborted);
+        await Clients.Caller.SendAsync("match.state.snapshot", snapshot, Context.ConnectionAborted);
+        await rounds.DeliverPendingAsync(message.MatchId, GetHumanSubject(), Context.ConnectionAborted);
+    }
 
-        object snapshot = rounds.Attach(matchId, subject, Context.ConnectionId);
-        await Clients.Caller.SendAsync("match.state.snapshot", snapshot);
+    public async Task ResumeMatch(MatchResumeMessage message, MatchRoundService rounds)
+    {
+        if (!string.Equals(message.Type, "match.resume", StringComparison.Ordinal) || message.Version != 1)
+            throw new HubException("invalid_message");
+        string subject=GetHumanSubject();
+        Guid? matchId=message.MatchId ?? await rounds.FindLatestMatchAsync(subject,Context.ConnectionAborted);
+        if(matchId is null) throw new HubException("active_match_not_found");
+        object snapshot=await rounds.AttachAsync(matchId.Value,subject,Context.ConnectionId,Context.ConnectionAborted);
+        await Groups.AddToGroupAsync(Context.ConnectionId,$"match:{matchId}",Context.ConnectionAborted);
+        await Clients.Caller.SendAsync("match.state.snapshot",snapshot,Context.ConnectionAborted);
+        await rounds.DeliverPendingAsync(matchId,subject,Context.ConnectionAborted);
     }
 
     public Task SubmitRoundPlan(SubmitRoundPlanMessage message, MatchRoundService rounds)
     {
         string subject = GetHumanSubject();
-        return rounds.SubmitAsync(subject, Context.ConnectionId, message);
+        return rounds.SubmitAsync(subject, Context.ConnectionId, message, Context.ConnectionAborted);
     }
 
     public Task AbandonMatch(Guid matchId, MatchRoundService rounds)
     {
         if (matchId == Guid.Empty)
             throw new HubException("invalid_match_id");
-        return rounds.AbandonAsync(matchId, GetHumanSubject());
+        return rounds.AbandonAsync(matchId, GetHumanSubject(), Context.ConnectionAborted);
     }
 
     public Task SetMatchNickname(SetMatchNicknameMessage message, MatchRoundService rounds)
@@ -80,7 +90,7 @@ public sealed class GameHub : Hub
             message.Version != SetMatchNicknameMessage.CurrentVersion || message.RequestId == Guid.Empty ||
             message.MatchId == Guid.Empty || string.IsNullOrEmpty(message.Nickname))
             throw new HubException("invalid_message");
-        return rounds.SetNicknameAsync(message.MatchId, subject, Context.ConnectionId, message.Nickname);
+        return rounds.SetNicknameAsync(message.MatchId, subject, Context.ConnectionId, message.Nickname, Context.ConnectionAborted);
     }
 
     private static void ValidateQueueMessage(string type, int version, string expectedType)
@@ -111,3 +121,5 @@ public sealed class GameHub : Hub
         return subject;
     }
 }
+
+public sealed record MatchResumeMessage(string Type,int Version,Guid? MatchId,long? LastSequence);

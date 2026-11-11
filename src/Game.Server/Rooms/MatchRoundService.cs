@@ -1,262 +1,250 @@
 using Game.Domain;
+using Game.Infrastructure;
 using Game.Server.Contracts.V1;
 using Game.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Game.Server.Rooms;
 
-/// <summary>Coordina el estado en memoria y los planes simultáneos de cada partida.</summary>
-public sealed class MatchRoundService(IHubContext<GameHub> hub, RoundResolver resolver)
+public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSource criticalSource,
+    IMatchSessionStore store, IConfiguration? configuration = null, ILogger<MatchRoundService>? logger = null)
 {
-    private readonly ConcurrentDictionary<Guid, MatchSession> matches = [];
+    // Transport routing only; confirmed game state is loaded from PostgreSQL.
+    private readonly ConcurrentDictionary<(Guid MatchId, string Subject), string> connections = [];
+    private readonly ConcurrentDictionary<(Guid MatchId, string Subject), DateTimeOffset> reconnectGrace = [];
+    private sealed record Notification(string Subject, string Event, JsonElement Message);
+    private sealed record SubmissionResult(JsonElement Acknowledgement, IReadOnlyList<Notification> Outcomes);
+    private readonly TimeSpan roundTimeout = TimeSpan.FromMinutes(configuration?.GetValue("MatchLifecycle:RoundTimeoutMinutes", 5) ?? 5);
+    private readonly TimeSpan disconnectGrace = TimeSpan.FromSeconds(configuration?.GetValue("MatchLifecycle:DisconnectGraceSeconds", 30) ?? 30);
 
-    public async Task<int> ExpireInactiveMatchesAsync(DateTimeOffset now, TimeSpan inactivityLimit, CancellationToken cancellationToken)
+    public async Task CreateAsync(MatchState match, IReadOnlyDictionary<string, Guid> participants, CancellationToken ct = default)
     {
-        List<(string ConnectionId, object Message)> notifications = [];
-        foreach (MatchSession session in matches.Values)
-        {
-            lock (session.Gate)
-            {
-                if (session.Match.Status != MatchStatus.Active || now - session.Match.LastActivityAt < inactivityLimit)
-                    continue;
-
-                Dictionary<string, PendingRoundPlan> pendingPlans = new(session.PendingPlans);
-                string[] submittedSubjects = pendingPlans.Keys.ToArray();
-                Guid? winnerId = submittedSubjects.Length == 1
-                    ? session.Participants[submittedSubjects[0]]
-                    : null;
-                session.Match = session.Match with
-                {
-                    Status = MatchStatus.Finished,
-                    WinnerId = winnerId,
-                    SequenceNumber = session.Match.SequenceNumber + 1,
-                    LastActivityAt = now
-                };
-                foreach ((string subject, string connectionId) in session.Connections)
-                {
-                    object message = CreateEndedMessage(session, subject, "inactivity");
-                    notifications.Add((connectionId, message));
-                    if (pendingPlans.TryGetValue(subject, out PendingRoundPlan? pending) &&
-                        session.Submissions.TryGetValue(pending.CommandKey, out SubmissionRecord? record))
-                        record.Outcome = new CachedOutcome("match.ended", message);
-                }
-                session.PendingPlans.Clear();
-            }
-        }
-
-        foreach ((string connectionId, object message) in notifications)
-        {
-            await hub.Clients.Client(connectionId).SendAsync("match.ended", message, cancellationToken);
-        }
-
-        return notifications.Count;
+        match = match with { LastActivityAt = Microseconds(match.LastActivityAt) };
+        var session = new MatchSession(match, participants);
+        session.RoundDeadlineAt = match.LastActivityAt.Add(roundTimeout);
+        session.NewEvents.Add(new(match.MatchId, match.SequenceNumber, "match.started", 1, match.LastActivityAt,
+            JsonSerializer.SerializeToElement(new { state = match, reason = "created" })));
+        await store.CreateAsync(session, ct);
     }
+    public async Task<MatchStatus?> GetMatchStatusAsync(Guid matchId, CancellationToken ct = default) =>
+        (await store.ReadAsync(matchId, ct))?.Match.Status;
+    public Task<bool> IsPlayerActiveAsync(string subject, CancellationToken ct = default) => store.IsPlayerActiveAsync(subject, ct);
+    public Task<Guid?> FindLatestMatchAsync(string subject, CancellationToken ct = default) => store.FindLatestMatchAsync(subject, ct);
 
-    public async Task AbandonAsync(Guid matchId, string subject)
+    public Task<object> AttachAsync(Guid matchId, string subject, string connectionId, CancellationToken ct = default) => HubGuardAsync<object>(async () =>
     {
-        MatchSession session = GetParticipant(matchId, subject);
-        List<(string ConnectionId, object Message)> notifications = [];
-        lock (session.Gate)
-        {
-            if (session.Match.Status != MatchStatus.Active)
-                throw new HubException("match_completed");
+        var session = await store.ReadAsync(matchId, ct);
+        Authorize(session, subject);
+        connections[(matchId, subject)] = connectionId;
+        reconnectGrace.TryRemove((matchId,subject),out _);
+        return CreateSnapshot(session!, subject);
+    });
 
-            string opponentSubject = session.Participants.Keys.Single(candidate => candidate != subject);
-            session.Match = session.Match with
-            {
-                Status = MatchStatus.Finished,
-                WinnerId = session.Participants[opponentSubject],
-                SequenceNumber = session.Match.SequenceNumber + 1,
-                LastActivityAt = DateTimeOffset.UtcNow
-            };
-
-            Dictionary<string, PendingRoundPlan> pendingPlans = new(session.PendingPlans);
-            foreach ((string playerSubject, string connectionId) in session.Connections)
-            {
-                object message = CreateEndedMessage(session, playerSubject, "abandonment");
-                notifications.Add((connectionId, message));
-                if (pendingPlans.TryGetValue(playerSubject, out PendingRoundPlan? pending) &&
-                    session.Submissions.TryGetValue(pending.CommandKey, out SubmissionRecord? record))
-                    record.Outcome = new CachedOutcome("match.ended", message);
-            }
-            session.PendingPlans.Clear();
-        }
-
-        foreach ((string connectionId, object message) in notifications)
-            await hub.Clients.Client(connectionId).SendAsync("match.ended", message);
-    }
-
-    public void Register(MatchState match, IReadOnlyDictionary<string, Guid> participants)
-    {
-        matches.TryAdd(match.MatchId, new MatchSession(match, participants));
-    }
-
-    public MatchStatus? GetMatchStatus(Guid matchId)
-    {
-        if (!matches.TryGetValue(matchId, out MatchSession? session)) return null;
-        lock (session.Gate) return session.Match.Status;
-    }
-
-    public object Attach(Guid matchId, string subject, string connectionId)
-    {
-        MatchSession session = GetParticipant(matchId, subject);
-        lock (session.Gate)
-        {
-            session.Connections[subject] = connectionId;
-            return CreateSnapshot(session, subject);
-        }
-    }
-
-    public async Task SetNicknameAsync(Guid matchId, string subject, string connectionId, string nickname)
+    public Task SetNicknameAsync(Guid matchId, string subject, string connectionId, string nickname, CancellationToken ct = default) => HubGuardAsync(async () =>
     {
         if (string.IsNullOrEmpty(nickname) || nickname.Length > 10 ||
-            !Regex.IsMatch(nickname, @"^[\p{L}\p{N}_-]+$", RegexOptions.CultureInvariant))
-            throw new HubException("invalid_nickname");
-
-        List<(string ConnectionId, object Snapshot)> notifications = [];
-        MatchSession session = GetParticipant(matchId, subject);
-        lock (session.Gate)
+            !Regex.IsMatch(nickname, @"^[\p{L}\p{N}_-]+$", RegexOptions.CultureInvariant)) throw new HubException("invalid_nickname");
+        var messages = await store.MutateAsync(matchId, session =>
         {
-            if (session.Match.Status != MatchStatus.Active)
-                throw new HubException("match_completed");
-            if (session.Nicknames.ContainsKey(subject))
-                throw new HubException("nickname_already_set");
-
+            Authorize(session, subject); RequireActive(session);
+            if (session.Nicknames.ContainsKey(subject)) throw new HubException("nickname_already_set");
             session.Nicknames[subject] = nickname;
-            session.Connections[subject] = connectionId;
-            foreach ((string playerSubject, string playerConnection) in session.Connections)
-                notifications.Add((playerConnection, CreateSnapshot(session, playerSubject)));
-        }
+            if (session.Nicknames.Count == 2) session.StartedAt = CaptureTime();
+            var notifications = session.Participants.Keys.Select(player => new Notification(player, "match.state.snapshot",
+                JsonSerializer.SerializeToElement(CreateSnapshot(session, player)))).ToArray();
+            return notifications;
+        }, ct);
+        connections[(matchId, subject)] = connectionId;
+        await PublishAsync(matchId, messages, ct);
+    });
 
-        foreach ((string playerConnection, object snapshot) in notifications)
-            await hub.Clients.Client(playerConnection).SendAsync("match.state.snapshot", snapshot);
-    }
-
-    public async Task SubmitAsync(string subject, string connectionId, SubmitRoundPlanMessage message)
+    public Task SubmitAsync(string subject, string connectionId, SubmitRoundPlanMessage message, CancellationToken ct = default) => HubGuardAsync(async () =>
     {
-        RoundPlanMessageValidationResult validation = SubmitRoundPlanMessageValidator.Validate(message);
-        if (!validation.IsValid)
+        var validation = SubmitRoundPlanMessageValidator.Validate(message);
+        if (!validation.IsValid) throw new HubException($"invalid_message:{validation.Issues[0].Code}");
+        var request = validation.Request!;
+        var response = await store.MutateAsync(request.MatchId, session =>
         {
-            throw new HubException($"invalid_message:{validation.Issues[0].Code}");
-        }
+            Authorize(session, subject);
+            var key = new CommandKey(subject, request.RequestId);
+            byte[] fingerprint = SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+            { request.MatchId, request.ExpectedSequence, Actions = request.Actions.Select(action => action.ToString()).ToArray() }));
+            if (session.Submissions.TryGetValue(key, out var previous))
+            {
+                if (!CryptographicOperations.FixedTimeEquals(previous.Fingerprint, fingerprint)) throw new HubException("idempotency_key_reused");
+                return new SubmissionResult(previous.Acknowledgement, previous.Outcome is null ? [] :
+                    [new(subject, previous.Outcome.EventName, previous.Outcome.Message)]);
+            }
+            RequireActive(session);
+            if (session.Nicknames.Count != 2) throw new HubException("nicknames_required");
+            if (request.ExpectedSequence != session.Match.SequenceNumber) throw new HubException("stale_sequence");
+            if (session.PendingPlans.ContainsKey(subject)) throw new HubException("round_plan_already_submitted");
+            var plan = new RoundPlan(session.Participants[subject], request.Actions);
+            try
+            {
+                var player = session.Match.FirstPlayer.PlayerId == plan.PlayerId ? session.Match.FirstPlayer : session.Match.SecondPlayer;
+                RoundResolver.ValidatePlan(plan, player, session.Match.RoundNumber);
+            }
+            catch (InvalidOperationException) { throw new HubException("invalid_round_plan:rules_violation"); }
+            var ack = JsonSerializer.SerializeToElement(new { type = "round.plan.accepted", version = 1, matchId = request.MatchId,
+                requestId = request.RequestId, sequence = session.Match.SequenceNumber });
+            session.Submissions.Add(key, new(fingerprint, ack));
+            session.PendingPlans.Add(subject, new(plan, key));
+            if (session.PendingPlans.Count != 2) return new SubmissionResult(ack, []);
 
-        MatchSession session = GetParticipant(validation.Request!.MatchId, subject);
-        object acknowledgement;
-        CachedOutcome? outcome = null;
-        string? firstConnection = null;
-        string? secondConnection = null;
-        CachedOutcome? outcomeForFirst = null;
-        CachedOutcome? outcomeForSecond = null;
-        lock (session.Gate)
+            var before = session.Match;
+            string first = session.Participants.Single(pair => pair.Value == before.FirstPlayer.PlayerId).Key;
+            string second = session.Participants.Single(pair => pair.Value == before.SecondPlayer.PlayerId).Key;
+            var firstPending = session.PendingPlans[first]; var secondPending = session.PendingPlans[second];
+            var rolls = new RecordingCriticalSource(criticalSource);
+            var resolution = new RoundResolver(rolls).Resolve(before, firstPending.Plan, secondPending.Plan, CaptureTime());
+            session.Match = resolution.Match;
+            session.RoundDeadlineAt = session.Match.Status == MatchStatus.Active ? session.Match.LastActivityAt.Add(roundTimeout) : null;
+            if (session.Match.Status == MatchStatus.Finished)
+            {
+                session.CompletedAt = session.Match.LastActivityAt;
+                session.TerminalReason = "completed";
+            }
+            session.NewEvents.Add(new(request.MatchId, session.Match.SequenceNumber, "round.resolved", 1, session.Match.LastActivityAt,
+                JsonSerializer.SerializeToElement(new { before, after = session.Match, firstPlan = firstPending.Plan, secondPlan = secondPending.Plan,
+                    criticalRolls = rolls.Values, resolution, reason = session.Match.Status == MatchStatus.Active ? "round" : "completed" })));
+            List<Notification> outcomes = [];
+            foreach (var pending in new[] { firstPending, secondPending })
+            {
+                var result = JsonSerializer.SerializeToElement(CreateResolution(resolution, before.RoundNumber, pending.CommandKey.Subject, session));
+                session.Submissions[pending.CommandKey].Outcome = new("round.resolved", result);
+                outcomes.Add(new(pending.CommandKey.Subject, "round.resolved", result));
+            }
+            session.PendingPlans.Clear();
+            Enqueue(session, outcomes, session.Match.SequenceNumber);
+            return new SubmissionResult(ack, outcomes);
+        }, ct);
+        connections[(request.MatchId, subject)] = connectionId;
+        await PublishAsync(request.MatchId, [new(subject, "round.plan.accepted", response.Acknowledgement)], ct);
+        await PublishAsync(request.MatchId, response.Outcomes, ct);
+    });
+
+    public Task AbandonAsync(Guid matchId, string subject, CancellationToken ct = default) => HubGuardAsync(async () =>
+    {
+        var notifications = await store.MutateAsync(matchId, session =>
         {
-            ValidatedRoundPlanRequest request = validation.Request;
-            Guid playerId = session.Participants[subject];
-            CommandKey commandKey = new(subject, request.RequestId);
-            string fingerprint = CreateFingerprint(request);
-            if (session.Submissions.TryGetValue(commandKey, out SubmissionRecord? previousSubmission))
+            Authorize(session, subject); RequireActive(session);
+            return Finish(session, session.Participants.Single(pair => pair.Key != subject).Value, "abandonment", CaptureTime());
+        }, ct);
+        await PublishAsync(matchId, notifications, ct);
+    });
+
+    public async Task<int> ExpireInactiveMatchesAsync(DateTimeOffset now, TimeSpan inactivityLimit, CancellationToken ct)
+    {
+        now = Microseconds(now);
+        int count = 0;
+        foreach (Guid id in await store.FindExpiredAsync(now, ct))
+        {
+            var notifications = await store.MutateAsync(id, session =>
             {
-                if (!string.Equals(previousSubmission.Fingerprint, fingerprint, StringComparison.Ordinal))
-                    throw new HubException("idempotency_key_reused");
-                acknowledgement = previousSubmission.Acknowledgement;
-                outcome = previousSubmission.Outcome;
-            }
-            else
+                if (session.Match.Status != MatchStatus.Active || now - session.Match.LastActivityAt < inactivityLimit) return Array.Empty<Notification>();
+                Guid? winner = session.PendingPlans.Count == 1 ? session.PendingPlans.Values.Single().Plan.PlayerId : null;
+                return Finish(session, winner, "inactivity", now);
+            }, ct);
+            count += notifications.Count(item => connections.ContainsKey((id, item.Subject)));
+            await PublishAsync(id, notifications, ct);
+        }
+        return count;
+    }
+
+    private static Notification[] Finish(MatchSession session, Guid? winner, string reason, DateTimeOffset now)
+    {
+        var before = session.Match;
+        session.Match = before with { Status = MatchStatus.Finished, WinnerId = winner, SequenceNumber = before.SequenceNumber + 1, LastActivityAt = now };
+        session.CompletedAt = now;
+        session.RoundDeadlineAt = null;
+        session.TerminalReason = reason;
+        var notifications = session.Participants.Keys.Select(subject => new Notification(subject, "match.ended",
+            JsonSerializer.SerializeToElement(CreateEndedMessage(session, subject, reason)))).ToArray();
+        foreach (var pair in session.PendingPlans)
+            session.Submissions[pair.Value.CommandKey].Outcome = new("match.ended", notifications.Single(item => item.Subject == pair.Key).Message);
+        session.PendingPlans.Clear();
+        session.NewEvents.Add(new(session.Match.MatchId, session.Match.SequenceNumber, "match.ended", 1, now,
+            JsonSerializer.SerializeToElement(new { before, after = session.Match, reason })));
+        Enqueue(session, notifications, session.Match.SequenceNumber);
+        return notifications;
+    }
+
+    private static void Enqueue(MatchSession session, IEnumerable<Notification> notifications, long sequence)
+    {
+        DateTimeOffset now=CaptureTime();
+        foreach(var item in notifications) session.NewNotifications.Add(new(Guid.NewGuid(),session.Match.MatchId,item.Subject,item.Event,sequence,item.Message,now));
+    }
+
+    private async Task PublishAsync(Guid matchId, IEnumerable<Notification> notifications, CancellationToken ct)
+    {
+        foreach (var notification in notifications)
+        {
+            if (!connections.TryGetValue((matchId, notification.Subject), out string? connection)) continue;
+            try { await hub.Clients.Client(connection).SendAsync(notification.Event, notification.Message, ct); }
+            catch (Exception)
             {
-                if (session.Match.Status != MatchStatus.Active)
-                    throw new HubException("match_completed");
-                if (session.Nicknames.Count != 2)
-                    throw new HubException("nicknames_required");
-                if (request.ExpectedSequence != session.Match.SequenceNumber)
-                    throw new HubException("stale_sequence");
-                if (session.PendingPlans.ContainsKey(subject))
-                    throw new HubException("round_plan_already_submitted");
-
-                RoundPlan plan = new(playerId, request.Actions);
-                try
-                {
-                    // Valida también todas las reglas propias del juego antes de guardar el plan.
-                    ValidateIndividualPlan(session.Match, plan);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    throw new HubException($"invalid_round_plan:{exception.Message}");
-                }
-
-                acknowledgement = new
-                {
-                    type = "round.plan.accepted", version = 1, matchId = request.MatchId,
-                    requestId = request.RequestId, sequence = session.Match.SequenceNumber
-                };
-                session.Submissions.Add(commandKey, new SubmissionRecord(fingerprint, acknowledgement));
-                session.PendingPlans[subject] = new PendingRoundPlan(plan, commandKey);
-                session.Connections[subject] = connectionId;
-
-                if (session.PendingPlans.Count == 2)
-                {
-                    string firstSubject = session.Participants.Single(pair => pair.Value == session.Match.FirstPlayer.PlayerId).Key;
-                    string secondSubject = session.Participants.Single(pair => pair.Value == session.Match.SecondPlayer.PlayerId).Key;
-                    RoundResolution result = resolver.Resolve(
-                        session.Match,
-                        session.PendingPlans[firstSubject].Plan,
-                        session.PendingPlans[secondSubject].Plan,
-                        DateTimeOffset.UtcNow);
-                    MatchState previous = session.Match;
-                    session.Match = result.Match;
-                    PendingRoundPlan firstPending = session.PendingPlans[firstSubject];
-                    PendingRoundPlan secondPending = session.PendingPlans[secondSubject];
-                    session.PendingPlans.Clear();
-                    firstConnection = session.Connections.GetValueOrDefault(firstSubject);
-                    secondConnection = session.Connections.GetValueOrDefault(secondSubject);
-                    outcomeForFirst = new CachedOutcome("round.resolved", CreateResolution(result, previous.RoundNumber, firstSubject, session));
-                    outcomeForSecond = new CachedOutcome("round.resolved", CreateResolution(result, previous.RoundNumber, secondSubject, session));
-                    session.Submissions[firstPending.CommandKey].Outcome = outcomeForFirst;
-                    session.Submissions[secondPending.CommandKey].Outcome = outcomeForSecond;
-                    if (firstPending.CommandKey.Subject == subject) outcome = outcomeForFirst;
-                    if (secondPending.CommandKey.Subject == subject) outcome = outcomeForSecond;
-                }
+                logger?.LogWarning("SignalR delivery failed after commit for match {MatchId}, event {Event}", matchId, notification.Event);
             }
         }
-
-        await hub.Clients.Client(connectionId).SendAsync("round.plan.accepted", acknowledgement);
-
-        if (outcomeForFirst is not null && firstConnection is not null)
-            await hub.Clients.Client(firstConnection).SendAsync(outcomeForFirst.EventName, outcomeForFirst.Message);
-        if (outcomeForSecond is not null && secondConnection is not null)
-            await hub.Clients.Client(secondConnection).SendAsync(outcomeForSecond.EventName, outcomeForSecond.Message);
-        else if (outcome is not null && outcomeForFirst is null && outcomeForSecond is null)
-            await hub.Clients.Client(connectionId).SendAsync(outcome.EventName, outcome.Message);
     }
-
-    private static void ValidateIndividualPlan(MatchState match, RoundPlan plan)
+    public async Task<int> DeliverPendingAsync(Guid? matchId=null,string? subject=null,CancellationToken ct=default)
     {
-        PlayerState player = match.FirstPlayer.PlayerId == plan.PlayerId ? match.FirstPlayer : match.SecondPlayer;
-        // Resolve con un plan vacío no es apropiado; duplicamos aquí las comprobaciones
-        // individuales para no consumir críticos hasta que llegue el segundo plan.
-        if (plan.Actions.Any(action => !Enum.IsDefined(action)) ||
-            plan.Actions.Sum(MatchRules.EnergyCostFor) != player.Energy)
-            throw new InvalidOperationException("all_energy_must_be_spent");
-        int blocks = plan.Actions.Count(action => action == GameAction.Block);
-        if (player.UsedBlockades + blocks > MatchRules.MaximumBlockadesPerMatch)
-            throw new InvalidOperationException("blockade_limit_exceeded");
-        int specials = plan.Actions.Count(action => action == GameAction.SpecialAttack);
-        if (specials > 0 && match.RoundNumber < MatchRules.SpecialAttackUnlockRound)
-            throw new InvalidOperationException("special_attack_locked");
-        if (specials > 1 || (specials > 0 && player.HasUsedSpecialAttack))
-            throw new InvalidOperationException("special_attack_already_used");
+        int delivered=0;
+        foreach(var item in await store.ReadPendingNotificationsAsync(matchId,subject,100,ct))
+        {
+            if(!connections.TryGetValue((item.MatchId,item.Subject),out string? connection)) continue;
+            try
+            {
+                await hub.Clients.Client(connection).SendAsync(item.EventName,item.Message,ct);
+                await store.MarkNotificationDeliveredAsync(item.Id,ct); delivered++;
+            }
+            catch(Exception)
+            {
+                int seconds=Math.Min(60,1 << Math.Min(item.AttemptCount,6));
+                await store.MarkNotificationFailedAsync(item.Id,"transport_failure",CaptureTime().AddSeconds(seconds),ct);
+                logger?.LogWarning("Outbox delivery failed for match {MatchId}, event {Event}",item.MatchId,item.EventName);
+            }
+        }
+        return delivered;
     }
-
-    private MatchSession GetParticipant(Guid matchId, string subject)
+    public void DetachConnection(string connectionId)
     {
-        if (!matches.TryGetValue(matchId, out MatchSession? session) || !session.Participants.ContainsKey(subject))
-            throw new HubException("not_match_participant");
-        return session;
+        foreach(var item in connections.Where(pair=>pair.Value==connectionId).ToArray())
+        {
+            connections.TryRemove(item.Key,out _);
+            reconnectGrace[item.Key]=CaptureTime().Add(disconnectGrace);
+        }
     }
-
-    private static string CreateFingerprint(ValidatedRoundPlanRequest request) =>
-        $"{request.MatchId:N}|{request.ExpectedSequence}|{string.Join(',', request.Actions)}";
-
+    public bool IsWithinReconnectGrace(Guid matchId,string subject,DateTimeOffset now) =>
+        reconnectGrace.TryGetValue((matchId,subject),out var until) && now <= until;
+    private static void Authorize(MatchSession? session, string subject)
+    {
+        if (session is null || !session.Participants.ContainsKey(subject)) throw new HubException("not_match_participant");
+    }
+    private static void RequireActive(MatchSession session)
+    {
+        if (session.Match.Status != MatchStatus.Active) throw new HubException("match_completed");
+    }
+    private static async Task HubGuardAsync(Func<Task> operation)
+    { await HubGuardAsync(async () => { await operation(); return true; }); }
+    private static async Task<T> HubGuardAsync<T>(Func<Task<T>> operation)
+    {
+        try { return await operation(); }
+        catch (PersistenceException) { throw new HubException("database_unavailable"); }
+        catch (MatchOperationException exception) { throw new HubException(exception.Code); }
+    }
+    private static DateTimeOffset Microseconds(DateTimeOffset value) => new(value.UtcTicks - value.UtcTicks % 10, TimeSpan.Zero);
+    private static DateTimeOffset CaptureTime() => Microseconds(DateTimeOffset.UtcNow);
+    private sealed class RecordingCriticalSource(ICriticalHitSource source) : ICriticalHitSource
+    {
+        public List<int> Values { get; } = [];
+        public int NextBasisPointRoll() { int value = source.NextBasisPointRoll(); Values.Add(value); return value; }
+    }
     private static object CreateSnapshot(MatchSession session, string subject)
     {
         PlayerState you = session.Match.FirstPlayer.PlayerId == session.Participants[subject]
@@ -267,6 +255,10 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, RoundResolver re
         {
             type = "match.state.snapshot", version = 1, matchId = session.Match.MatchId,
             sequence = session.Match.SequenceNumber, roundNumber = session.Match.RoundNumber,
+            winnerId = session.Match.WinnerId,
+            hasSubmittedPlan = session.PendingPlans.ContainsKey(subject),
+            roundDeadlineAt = session.RoundDeadlineAt,
+            terminalReason = session.TerminalReason,
             status = session.Match.Status != MatchStatus.Active ? "completed" : session.Nicknames.Count == 2 ? "active" : "waitingForNicknames",
             you = new { playerId = you.PlayerId, isHost = you.PlayerId == session.Match.FirstPlayer.PlayerId, nickname = session.Nicknames.GetValueOrDefault(subject), health = you.Health, energy = you.Energy,
                 usedBlockades = you.UsedBlockades, hasUsedSpecialAttack = you.HasUsedSpecialAttack },
@@ -286,6 +278,7 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, RoundResolver re
             type = "match.ended", version = 1, matchId = session.Match.MatchId,
             sequence = session.Match.SequenceNumber, roundNumber = session.Match.RoundNumber,
             reason, status = "completed", winnerId = session.Match.WinnerId,
+            hasSubmittedPlan = false, roundDeadlineAt = (DateTimeOffset?)null, terminalReason = reason,
             you = new { playerId = you.PlayerId, isHost = you.PlayerId == session.Match.FirstPlayer.PlayerId, nickname = session.Nicknames.GetValueOrDefault(subject), health = you.Health, energy = you.Energy,
                 usedBlockades = you.UsedBlockades, hasUsedSpecialAttack = you.HasUsedSpecialAttack },
             opponent = new { playerId = opponent.PlayerId, isHost = opponent.PlayerId == session.Match.FirstPlayer.PlayerId, nickname = session.Nicknames.GetValueOrDefault(
@@ -310,6 +303,7 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, RoundResolver re
             opponentAttacksBlocked = isFirst ? result.SecondPlayerAttacksBlocked : result.FirstPlayerAttacksBlocked,
             status = result.Match.Status == MatchStatus.Active ? "active" : "completed",
             winnerId = result.Match.WinnerId,
+            hasSubmittedPlan = false, roundDeadlineAt = session.RoundDeadlineAt, terminalReason = session.TerminalReason,
             you = new { playerId = you.PlayerId, isHost = you.PlayerId == result.Match.FirstPlayer.PlayerId, nickname = session.Nicknames.GetValueOrDefault(subject), health = you.Health, energy = you.Energy,
                 usedBlockades = you.UsedBlockades, hasUsedSpecialAttack = you.HasUsedSpecialAttack },
             opponent = new { playerId = opponent.PlayerId, isHost = opponent.PlayerId == result.Match.FirstPlayer.PlayerId, nickname = session.Nicknames.GetValueOrDefault(
@@ -317,27 +311,4 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, RoundResolver re
         };
     }
 
-    private readonly record struct CommandKey(string Subject, Guid RequestId);
-
-    private sealed record PendingRoundPlan(RoundPlan Plan, CommandKey CommandKey);
-
-    private sealed record CachedOutcome(string EventName, object Message);
-
-    private sealed class SubmissionRecord(string fingerprint, object acknowledgement)
-    {
-        public string Fingerprint { get; } = fingerprint;
-        public object Acknowledgement { get; } = acknowledgement;
-        public CachedOutcome? Outcome { get; set; }
-    }
-
-    private sealed class MatchSession(MatchState match, IReadOnlyDictionary<string, Guid> participants)
-    {
-        public object Gate { get; } = new();
-        public MatchState Match { get; set; } = match;
-        public Dictionary<string, Guid> Participants { get; } = new(participants);
-        public Dictionary<string, string> Connections { get; } = [];
-        public Dictionary<string, string> Nicknames { get; } = [];
-        public Dictionary<string, PendingRoundPlan> PendingPlans { get; } = [];
-        public Dictionary<CommandKey, SubmissionRecord> Submissions { get; } = [];
-    }
 }

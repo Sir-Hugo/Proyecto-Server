@@ -105,7 +105,7 @@ public sealed class RoundResolver(ICriticalHitSource criticalHitSource)
     }
     
     // Valida que el plan de ronda sea válido para el jugador correspondiente.
-    private static void ValidatePlan(RoundPlan plan, PlayerState player, int roundNumber)
+    public static void ValidatePlan(RoundPlan plan, PlayerState player, int roundNumber)
     {
         if (plan.PlayerId != player.PlayerId)
         {

@@ -1,4 +1,5 @@
 using Game.Domain;
+using Game.Infrastructure;
 
 namespace Game.Server.Rooms;
 
@@ -18,10 +19,18 @@ public sealed class MatchExpirationService(
         using PeriodicTimer timer = new(checkInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            int notifiedPlayers = await matches.ExpireInactiveMatchesAsync(
-                DateTimeOffset.UtcNow, inactivityLimit, stoppingToken);
-            if (notifiedPlayers > 0)
-                logger.LogInformation("Ended inactive matches and notified {PlayerCount} players.", notifiedPlayers);
+            try
+            {
+                int notifiedPlayers = await matches.ExpireInactiveMatchesAsync(
+                    DateTimeOffset.UtcNow, inactivityLimit, stoppingToken);
+                if (notifiedPlayers > 0)
+                    logger.LogInformation("Ended inactive matches and attempted delivery to {PlayerCount} connected players.", notifiedPlayers);
+            }
+            catch (PersistenceException)
+            {
+                logger.LogWarning("PostgreSQL unavailable during match expiration; will retry at the next interval.");
+            }
+
         }
     }
 }

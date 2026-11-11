@@ -1,6 +1,7 @@
 # Local Auth0 settings and other environment-specific files
 /env/*
 !/env/.env.example
+!/env/postgres.env.example
 /.env
 /.env.*
 !/.env.example
@@ -30,6 +31,7 @@ TestResults/
 *.log
 *.tmp
 *.temp
+/.tmp-tools/
 
 # Certificates, keys, and secret stores
 *.pfx

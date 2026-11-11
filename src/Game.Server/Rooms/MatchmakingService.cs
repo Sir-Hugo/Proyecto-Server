@@ -1,145 +1,109 @@
 using Game.Domain;
+using Game.Infrastructure;
 using Game.Server.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Game.Server.Rooms;
 
-public sealed class MatchmakingService(IHubContext<GameHub> hubContext, IConfiguration configuration, MatchRoundService roundService)
+public sealed class MatchmakingService(IHubContext<GameHub> hubContext, IConfiguration configuration, MatchRoundService roundService,
+    ILogger<MatchmakingService>? logger = null)
 {
-    private readonly object gate = new();
+    private readonly SemaphoreSlim gate = new(1, 1);
     private readonly List<QueueEntry> entries = [];
-    private readonly Dictionary<Guid, MatchState> matches = [];
-    private readonly Dictionary<Guid, Dictionary<string, Guid>> participants = [];
-    private readonly TimeSpan maximumWait = TimeSpan.FromMinutes(
-        configuration.GetValue("Matchmaking:MaximumWaitMinutes", 4));
+    private readonly TimeSpan maximumWait = TimeSpan.FromMinutes(configuration.GetValue("Matchmaking:MaximumWaitMinutes", 4));
 
-    public async Task JoinAsync(string subject, string connectionId, Guid requestId)
+    public async Task JoinAsync(string subject, string connectionId, Guid requestId, CancellationToken ct = default)
     {
-        QueueEntry? waitingPlayer;
-        QueueEntry newPlayer;
-        Guid? matchedMatchId = null;
-        lock (gate)
+        QueueEntry? waiting = null;
+        QueueEntry incoming;
+        MatchState? match = null;
+        List<QueueEntry> cancelled = [];
+        try
         {
-            QueueEntry? existing = entries.FirstOrDefault(entry => entry.Subject == subject);
-            if (existing is not null)
+            await gate.WaitAsync(ct);
+            try
             {
-                existing.ConnectionId = connectionId;
-                existing.RequestId = requestId;
-                newPlayer = existing;
-                waitingPlayer = null;
-            }
-            else
-            {
-                newPlayer = new QueueEntry(subject, connectionId, requestId, DateTimeOffset.UtcNow);
-                waitingPlayer = entries.FirstOrDefault(entry => entry.Subject != subject);
-                if (waitingPlayer is null) entries.Add(newPlayer);
-                else
+                if (await roundService.IsPlayerActiveAsync(subject, ct)) throw new HubException("player_already_in_match");
+                incoming = entries.FirstOrDefault(entry => entry.Subject == subject) ?? new(subject, connectionId, requestId, DateTimeOffset.UtcNow);
+                incoming.ConnectionId = connectionId;
+                incoming.RequestId = requestId;
+                if (!entries.Contains(incoming))
                 {
-                    entries.Remove(waitingPlayer);
-                    Guid playerOneId = Guid.NewGuid();
-                    Guid playerTwoId = Guid.NewGuid();
-                    MatchState match = MatchState.Create(Guid.NewGuid(), playerOneId, playerTwoId, DateTimeOffset.UtcNow);
-                    matches.Add(match.MatchId, match);
-                    participants.Add(match.MatchId, new Dictionary<string, Guid>
+                    // A queued user may have started a room match in the meantime.
+                    while (entries.Count > 0 && await roundService.IsPlayerActiveAsync(entries[0].Subject, ct))
+                    { cancelled.Add(entries[0]); entries.RemoveAt(0); }
+                    waiting = entries.FirstOrDefault();
+                    if (waiting is null) entries.Add(incoming);
+                    else
                     {
-                        [waitingPlayer.Subject] = playerOneId,
-                        [newPlayer.Subject] = playerTwoId
-                    });
-                    roundService.Register(match, participants[match.MatchId]);
-                    matchedMatchId = match.MatchId;
-                    newPlayer.PlayerId = playerTwoId;
-                    waitingPlayer.PlayerId = playerOneId;
+                        match = MatchState.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
+                        // Queue entries are removed only after durable creation has committed.
+                        await roundService.CreateAsync(match, new Dictionary<string, Guid>
+                        { [waiting.Subject] = match.FirstPlayer.PlayerId, [subject] = match.SecondPlayer.PlayerId }, ct);
+                        entries.Remove(waiting);
+                    }
                 }
             }
+            finally { gate.Release(); }
         }
+        catch (PersistenceException) { throw new HubException("database_unavailable"); }
+        catch (MatchOperationException exception) { throw new HubException(exception.Code); }
 
-        if (waitingPlayer is null)
+        foreach (var stale in cancelled) await SendStatus(stale, "cancelled");
+        if (match is null) { await SendStatus(incoming, "queued"); return; }
+        var found = new { type = "match.found", version = 1, matchId = match.MatchId,
+            playerIds = new[] { match.FirstPlayer.PlayerId, match.SecondPlayer.PlayerId } };
+        var started = new { type = "match.started", version = 1, matchId = match.MatchId,
+            sequence = match.SequenceNumber, roundNumber = match.RoundNumber,
+            playerIds = new[] { match.FirstPlayer.PlayerId, match.SecondPlayer.PlayerId } };
+        foreach (var player in new[] { waiting!, incoming })
         {
-            await SendStatus(newPlayer, "queued");
-            return;
-        }
-
-        MatchState startedMatch;
-        lock (gate) startedMatch = matches[matchedMatchId!.Value];
-        object found = new
-        {
-            type = "match.found", version = 1, matchId = startedMatch.MatchId,
-            playerIds = new[] { waitingPlayer.PlayerId, newPlayer.PlayerId }
-        };
-        await hubContext.Clients.Client(waitingPlayer.ConnectionId).SendAsync("match.found", found);
-        await hubContext.Clients.Client(newPlayer.ConnectionId).SendAsync("match.found", found);
-        object started = new
-        {
-            type = "match.started", version = 1, matchId = startedMatch.MatchId,
-            sequence = startedMatch.SequenceNumber, roundNumber = startedMatch.RoundNumber,
-            playerIds = new[] { waitingPlayer.PlayerId, newPlayer.PlayerId }
-        };
-        await hubContext.Clients.Client(waitingPlayer.ConnectionId).SendAsync("match.started", started);
-        await hubContext.Clients.Client(newPlayer.ConnectionId).SendAsync("match.started", started);
-    }
-
-    public bool TryGetMatchParticipant(
-        Guid matchId,
-        string subject,
-        out MatchState? match,
-        out Guid playerId)
-    {
-        lock (gate)
-        {
-            match = matches.GetValueOrDefault(matchId);
-            playerId = Guid.Empty;
-            bool isParticipant = participants.TryGetValue(matchId, out Dictionary<string, Guid>? players) &&
-                                 players.TryGetValue(subject, out playerId);
-            return match is not null && isParticipant;
+            await DeliverAsync(player.ConnectionId, "match.found", found);
+            await DeliverAsync(player.ConnectionId, "match.started", started);
         }
     }
 
-    public async Task CancelAsync(string subject, Guid requestId)
+    public async Task CancelAsync(string subject, Guid requestId, CancellationToken ct = default)
     {
         QueueEntry? entry;
-        lock (gate)
+        await gate.WaitAsync(ct);
+        try
         {
             entry = entries.FirstOrDefault(candidate => candidate.Subject == subject && candidate.RequestId == requestId);
             if (entry is not null) entries.Remove(entry);
         }
-
+        finally { gate.Release(); }
         if (entry is not null) await SendStatus(entry, "cancelled");
     }
 
-    public async Task ExpireAsync(CancellationToken cancellationToken)
+    public async Task ExpireAsync(CancellationToken ct)
     {
         QueueEntry[] expired;
-        lock (gate)
+        await gate.WaitAsync(ct);
+        try
         {
             DateTimeOffset cutoff = DateTimeOffset.UtcNow - maximumWait;
             expired = entries.Where(entry => entry.QueuedAt <= cutoff).ToArray();
-            foreach (QueueEntry entry in expired) entries.Remove(entry);
+            foreach (var entry in expired) entries.Remove(entry);
         }
-
-        foreach (QueueEntry entry in expired)
-        {
-            await hubContext.Clients.Client(entry.ConnectionId).SendAsync("matchmaking.status", new
-            {
-                type = "matchmaking.status", version = 1, requestId = entry.RequestId,
-                status = "timedOut", queuedAt = entry.QueuedAt
-            }, cancellationToken);
-        }
+        finally { gate.Release(); }
+        foreach (var entry in expired) await SendStatus(entry, "timedOut");
     }
 
-    private Task SendStatus(QueueEntry entry, string status) =>
-        hubContext.Clients.Client(entry.ConnectionId).SendAsync("matchmaking.status", new
-        {
-            type = "matchmaking.status", version = 1, requestId = entry.RequestId,
-            status, queuedAt = entry.QueuedAt
-        });
+    private Task SendStatus(QueueEntry entry, string status) => DeliverAsync(entry.ConnectionId, "matchmaking.status",
+        new { type = "matchmaking.status", version = 1, requestId = entry.RequestId, status, queuedAt = entry.QueuedAt });
 
+    private async Task DeliverAsync(string connection, string eventName, object payload)
+    {
+        try { await hubContext.Clients.Client(connection).SendAsync(eventName, payload); }
+        catch (Exception) { logger?.LogWarning("SignalR matchmaking delivery failed for event {Event}", eventName); }
+    }
     private sealed class QueueEntry(string subject, string connectionId, Guid requestId, DateTimeOffset queuedAt)
     {
         public string Subject { get; } = subject;
         public string ConnectionId { get; set; } = connectionId;
         public Guid RequestId { get; set; } = requestId;
         public DateTimeOffset QueuedAt { get; } = queuedAt;
-        public Guid PlayerId { get; set; }
     }
 }
 

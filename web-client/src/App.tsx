@@ -23,7 +23,10 @@ type MatchSnapshot = {
   sequence: number
   roundNumber: number
   status: 'active' | 'completed' | 'waitingForNicknames'
-  winnerId?: string | null
+  winnerId: string | null
+  hasSubmittedPlan: boolean
+  roundDeadlineAt: string | null
+  terminalReason: string | null
   you: { playerId: string; isHost: boolean; nickname: string | null; health: number; energy: number; usedBlockades: number; hasUsedSpecialAttack: boolean }
   opponent: { health: number; isHost: boolean; nickname: string | null }
 }
@@ -42,12 +45,15 @@ function App() {
   const [createdInviteCode, setCreatedInviteCode] = useState<string | null>(null)
   const [roomMessage, setRoomMessage] = useState<string | null>(null)
   const [roomError, setRoomError] = useState<string | null>(null)
-  const [hubStatus, setHubStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
-  const [hubError, setHubError] = useState<string | null>(null)
+  const [connectionStatus, setHubStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+  const [connectionError, setHubError] = useState<string | null>(null)
+  const hubStatus = isAuthenticated ? connectionStatus : 'disconnected'
+  const hubError = isAuthenticated ? connectionError : null
   const [hubConnection, setHubConnection] = useState<HubConnection | null>(null)
   const [queueRequestId, setQueueRequestId] = useState<string | null>(null)
   const [queueStatus, setQueueStatus] = useState<'idle' | 'queued' | 'cancelled' | 'timedOut' | 'matched'>('idle')
   const [quickMatchId, setQuickMatchId] = useState<string | null>(null)
+  const [recoveredMatchId, setRecoveredMatchId] = useState<string | null>(() => localStorage.getItem('game.activeMatchId'))
   const [matchSnapshot, setMatchSnapshot] = useState<MatchSnapshot | null>(null)
   const [planCounts, setPlanCounts] = useState<Record<PlanAction, number>>({ Attack: 0, Block: 0, Reserve: 0, SpecialAttack: 0 })
   const [planPending, setPlanPending] = useState(false)
@@ -57,15 +63,13 @@ function App() {
   const [nickname, setNickname] = useState('')
   const latestMatchSequence = useRef(-1)
 
-  const activeMatchId = quickMatchId ?? room?.matchId ?? null
+  const activeMatchId = quickMatchId ?? room?.matchId ?? recoveredMatchId
 
-  const serverUrl = import.meta.env.VITE_GAME_SERVER_URL?.replace(/\/+$/, '')
+  const serverUrl = import.meta.env.VITE_GAME_SERVER_URL?.replace(/\/+$/, '') ?? window.location.origin
 
   // Abre y mantiene la conexión autenticada de SignalR mientras el usuario inició sesión.
   useEffect(() => {
     if (!isAuthenticated) {
-      setHubStatus('disconnected')
-      setHubError(null)
       return
     }
 
@@ -115,10 +119,14 @@ function App() {
       })
       connection.on('match.state.snapshot', (message: MatchSnapshot) => {
         if (!disposed) {
+          if (message.sequence < latestMatchSequence.current) return
           latestMatchSequence.current = message.sequence
+          localStorage.setItem('game.activeMatchId', message.matchId)
+          setRecoveredMatchId(message.matchId)
           setMatchSnapshot(message)
+          setMatchError(null)
           setPlanCounts({ Attack: 0, Block: 0, Reserve: 0, SpecialAttack: 0 })
-          setPlanPending(false)
+          setPlanPending(message.hasSubmittedPlan)
         }
       })
       connection.on('round.plan.accepted', (message: { sequence: number }) => {
@@ -126,6 +134,7 @@ function App() {
       })
       connection.on('round.resolved', (message: MatchSnapshot & RoundResult) => {
         if (disposed) return
+        if (message.sequence <= latestMatchSequence.current) return
         latestMatchSequence.current = message.sequence
         setMatchSnapshot({ ...message, roundNumber: message.status === 'active' ? message.roundNumber + 1 : message.roundNumber })
         setRoundResult(message)
@@ -138,6 +147,7 @@ function App() {
       })
       connection.on('match.ended', (message: MatchSnapshot & { reason: string }) => {
         if (disposed) return
+        if (message.sequence <= latestMatchSequence.current) return
         latestMatchSequence.current = message.sequence
         setMatchSnapshot(message)
         setMatchEndReason(message.reason === 'abandonment' || message.reason === 'inactivity' ? message.reason : null)
@@ -184,11 +194,34 @@ function App() {
   // Entra al canal privado cuando el servidor crea la partida desde una sala o la cola rápida.
   useEffect(() => {
     if (!activeMatchId || !hubConnection || hubStatus !== 'connected') return
-    setMatchError(null)
     void hubConnection.invoke('JoinMatch', { type: 'match.join', version: 1, matchId: activeMatchId }).catch((joinError: unknown) => {
       setMatchError(joinError instanceof Error ? joinError.message : 'No se pudo cargar la partida.')
     })
   }, [activeMatchId, hubConnection, hubStatus])
+
+  // Descubre la partida más reciente desde PostgreSQL cuando una pestaña nueva no conoce su identificador.
+  useEffect(() => {
+    if (activeMatchId || !hubConnection || hubStatus !== 'connected') return
+    void hubConnection.invoke('ResumeMatch', {
+      type: 'match.resume', version: 1, matchId: null,
+      lastSequence: latestMatchSequence.current < 0 ? null : latestMatchSequence.current,
+    }).catch((resumeError: unknown) => {
+      const message = resumeError instanceof Error ? resumeError.message : ''
+      if (!message.includes('active_match_not_found')) setMatchError(message || 'No se pudo recuperar la partida.')
+    })
+  }, [activeMatchId, hubConnection, hubStatus])
+
+  // La cola no se conserva en el servidor: una conexión que sigue esperando se reinscribe tras reconectar.
+  useEffect(() => {
+    if (!hubConnection || hubStatus !== 'connected' || queueStatus !== 'queued' || !queueRequestId) return
+    void hubConnection.invoke('JoinMatchmakingQueue', {
+      type: 'matchmaking.queue.join', version: 1, requestId: queueRequestId,
+    }).catch((queueError: unknown) => {
+      setQueueStatus('idle')
+      setQueueRequestId(null)
+      setHubError(queueError instanceof Error ? queueError.message : 'La cola se reinició; vuelve a inscribirte.')
+    })
+  }, [hubConnection, hubStatus, queueRequestId, queueStatus])
 
   // Envía una solicitud REST autenticada y convierte su respuesta JSON al tipo solicitado.
   const apiRequest = async <T,>(path: string, method = 'GET', body?: unknown): Promise<T> => {

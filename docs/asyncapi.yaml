@@ -7,6 +7,9 @@ info:
     messages carried through the authenticated SignalR hub. Every payload has a
     type and a separate numeric version. Match events are recipient-specific;
     resolved-round messages disclose outcomes but never the opponent's action list.
+    Match changes are confirmed in PostgreSQL before notifications are sent.
+    Durable notifications use an at-least-once transactional outbox; clients discard
+    repeated sequences and can resume a known or discoverable match after reconnecting.
     SignalR invocation failures are returned as HubException error strings; the
     operation's x-signalr-invocation-errors extension lists their current values.
 defaultContentType: application/json
@@ -17,7 +20,7 @@ servers:
     protocol: wss
     description: Local ASP.NET Core server using its development HTTPS certificate.
     security:
-      - bearerAuth: []
+      - $ref: '#/components/securitySchemes/bearerAuth'
 channels:
   gameHub:
     address: /hubs/game
@@ -84,14 +87,16 @@ operations:
       - round_plan_already_submitted
       - invalid_round_plan
       - idempotency_key_reused
+      - database_unavailable
   syncMatchState:
     action: receive
     channel:
       $ref: '#/channels/gameHub'
     messages:
       - $ref: '#/channels/gameHub/messages/syncMatchState'
-    summary: Planned: request the current player-specific match snapshot after reconnecting.
-    x-implementation-status: planned; current clients call JoinMatch instead.
+    summary: Request an authorized player-specific snapshot and resume real-time delivery.
+    x-signalr-method: ResumeMatch
+    x-signalr-invocation-errors: [invalid_message, active_match_not_found, not_match_participant, database_unavailable]
   joinMatchmakingQueue:
     action: receive
     channel:
@@ -99,7 +104,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/joinMatchmakingQueue'
     summary: Join the quick-match queue.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, player_already_in_match, database_unavailable]
   cancelMatchmakingQueue:
     action: receive
     channel:
@@ -121,6 +126,7 @@ operations:
       - match_completed
       - invalid_nickname
       - nickname_already_set
+      - database_unavailable
   joinMatch:
     action: receive
     channel:
@@ -128,7 +134,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/joinMatch'
     summary: Join the match and receive a player-specific state snapshot.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required, not_match_participant]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, not_match_participant, database_unavailable]
   joinRoom:
     action: receive
     channel:
@@ -186,7 +192,7 @@ operations:
       $ref: '#/channels/gameHub'
     messages:
       - $ref: '#/channels/gameHub/messages/playerConnectionChanged'
-    summary: Planned: notify the other participant about a disconnect or reconnection.
+    summary: "Planned: notify the other participant about a disconnect or reconnection."
     x-implementation-status: planned
   sendMatchmakingStatus:
     action: send
@@ -208,7 +214,7 @@ operations:
       $ref: '#/channels/gameHub'
     messages:
       - $ref: '#/channels/gameHub/messages/roomMemberChanged'
-    summary: Planned: notify room participants that a member joined or left.
+    summary: "Planned: notify room participants that a member joined or left."
     x-implementation-status: planned
   sendRoomReadyChanged:
     action: send
@@ -216,7 +222,7 @@ operations:
       $ref: '#/channels/gameHub'
     messages:
       - $ref: '#/channels/gameHub/messages/roomReadyChanged'
-    summary: Planned: notify room participants when a member changes ready state.
+    summary: "Planned: notify room participants when a member changes ready state."
     x-implementation-status: planned
   sendRoomMatchStarted:
     action: send
@@ -282,21 +288,22 @@ components:
               description: The player's complete action plan. Never broadcast to the opponent.
     SyncMatchState:
       allOf:
-        - $ref: '#/components/schemas/RequestEnvelope'
+        - $ref: '#/components/schemas/Envelope'
         - type: object
-          required: [type, version, matchId, lastSeenSequence]
+          required: [type, version]
           properties:
             type:
               type: string
-              enum: [match.state.sync]
+              enum: [match.resume]
             version:
               type: integer
               enum: [1]
             matchId:
-              type: string
+              type: [string, 'null']
               format: uuid
-            lastSeenSequence:
-              type: integer
+              description: Null asks PostgreSQL for the participant's latest match.
+            lastSequence:
+              type: [integer, 'null']
               minimum: 0
     JoinMatchmakingQueue:
       allOf:
@@ -427,7 +434,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Envelope'
         - type: object
-          required: [type, version, matchId, sequence, roundNumber, status, you, opponent]
+          required: [type, version, matchId, sequence, roundNumber, status, winnerId, hasSubmittedPlan, roundDeadlineAt, terminalReason, you, opponent]
           properties:
             type:
               type: string
@@ -448,6 +455,19 @@ components:
             status:
               type: string
               enum: [waitingForNicknames, active, completed]
+            winnerId:
+              type: [string, 'null']
+              format: uuid
+              description: Winner of a completed match; null for an active match or a draw.
+            hasSubmittedPlan:
+              type: boolean
+              description: Private flag for the requesting participant in the current round.
+            roundDeadlineAt:
+              type: [string, 'null']
+              format: date-time
+            terminalReason:
+              type: [string, 'null']
+              enum: [null, completed, inactivity, abandonment]
             you:
               $ref: '#/components/schemas/PlayerMatchView'
             opponent:
@@ -590,8 +610,8 @@ components:
               format: uuid
             reason:
               type: string
-              enum: [inactivity]
-              description: The round inactivity deadline expired before the match ended normally.
+              enum: [inactivity, abandonment]
+              description: The match ended because of inactivity or voluntary abandonment.
             you:
               $ref: '#/components/schemas/PlayerMatchView'
             opponent:
@@ -756,18 +776,16 @@ components:
     SyncMatchState:
       name: match.state.sync
       title: Synchronize match state
-      description: Planned message; the current implementation uses the JoinMatch hub method.
-      x-implementation-status: planned
+      description: Implemented by ResumeMatch; authentication determines the participant and private view.
       payload:
         $ref: '#/components/schemas/SyncMatchState'
       examples:
         - name: resumeMatch
           payload:
-            type: match.state.sync
+            type: match.resume
             version: 1
-            requestId: 740fbb08-81bf-4f6c-9f30-193975508012
             matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
-            lastSeenSequence: 4
+            lastSequence: 4
     JoinMatchmakingQueue:
       name: matchmaking.queue.join
       title: Join quick-match queue
@@ -817,6 +835,7 @@ components:
             sequence: 5
             roundNumber: 3
             status: active
+            winnerId: null
             you:
               playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
               isHost: true

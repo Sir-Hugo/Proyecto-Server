@@ -1,0 +1,44 @@
+name: proyecto-server
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Configure POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Configure POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure a local POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+  server:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__GameDatabase: Host=postgres;Port=5432;Database=${POSTGRES_DB:?Configure POSTGRES_DB};Username=${POSTGRES_USER:?Configure POSTGRES_USER};Password=${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD}
+      Authentication__Authority: ${AUTH0_AUTHORITY:?Configure AUTH0_AUTHORITY}
+      Authentication__Audience: ${AUTH0_AUDIENCE:?Configure AUTH0_AUDIENCE}
+      Auth0__ClientId: ${AUTH0_CLIENT_ID:?Configure AUTH0_CLIENT_ID}
+      Cors__AllowedOrigins__0: ${PUBLIC_ORIGIN:-http://localhost:8080}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+volumes:
+  postgres_data:

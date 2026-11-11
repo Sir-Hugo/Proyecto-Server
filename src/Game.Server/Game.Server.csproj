@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Game.Domain/Game.Domain.csproj" />
+    <ProjectReference Include="../Game.Infrastructure/Game.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GAME_POSTGRES_TESTS: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-dotnet@v6
+        with: { dotnet-version: '10.0.x' }
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web-client/package-lock.json
+      - run: dotnet restore ProyectoServer.slnx
+      - run: dotnet build ProyectoServer.slnx --configuration Release --no-restore
+      - run: dotnet test ProyectoServer.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+      - run: npm ci
+        working-directory: web-client
+      - run: npm run lint
+        working-directory: web-client
+      - run: npm run build
+        working-directory: web-client
+      - name: Validate Bicep compilation
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - name: Validate workflow syntax
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7
+      - name: Dependency vulnerability scan
+        run: |
+          dotnet list ProyectoServer.slnx package --vulnerable --include-transitive
+          cd web-client
+          npm audit --audit-level=high
+      - name: Generate and validate API contracts
+        env:
+          ConnectionStrings__GameDatabase: Host=localhost;Port=55432;Database=game;Username=game;Password=ci-only-password
+          Cors__AllowedOrigins__0: http://localhost:5080
+          Authentication__Authority: https://identity.test/
+          Authentication__Audience: ci-api
+          Auth0__ClientId: ci-public-client
+          ASPNETCORE_ENVIRONMENT: Testing
+          ASPNETCORE_URLS: http://127.0.0.1:5080
+        run: |
+          docker run -d --rm --name game-ci-postgres -e POSTGRES_DB=game -e POSTGRES_USER=game -e POSTGRES_PASSWORD=ci-only-password -p 55432:5432 postgres:17.11-bookworm
+          for _ in {1..30}; do docker exec game-ci-postgres pg_isready -U game -d game && break; sleep 1; done
+          dotnet run --project tools/Game.Database --no-build --configuration Release -- migrate
+          dotnet run --project src/Game.Server --no-build --configuration Release > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid || true; docker stop game-ci-postgres || true' EXIT
+          for _ in {1..30}; do curl --fail --silent http://127.0.0.1:5080/health/ready && break; sleep 1; done
+          curl --fail --silent http://127.0.0.1:5080/openapi/v1.json --output openapi.json
+          npx --yes @redocly/cli@2.77.0 lint openapi.json
+          npx --yes @asyncapi/cli@6.3.0 validate docs/asyncapi.yaml
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with: { name: test-results, path: TestResults, if-no-files-found: ignore }
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v6
+        with: { dotnet-version: '10.0.x' }
+      - uses: github/codeql-action/init@v4
+        with: { languages: csharp, javascript-typescript }
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
