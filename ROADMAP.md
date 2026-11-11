@@ -20,7 +20,8 @@ Esta ruta organiza el trabajo para terminar primero el servidor local, luego des
 - **Fase 2B implementada:** creación y ciclo de partidas conectados a PostgreSQL, idempotencia y resolución transaccional, asignación activa exclusiva por usuario y eventos reproducibles. Ver `docs/phase2b-validation.md`.
 - **Fase 2C implementada:** recuperación de sesiones/salas, reconexión autorizada, resincronización por secuencia, plazos persistentes y entrega al menos una vez mediante outbox. Ver `docs/phase2c-validation.md`.
 - **Fase 3A implementada:** contenedor de producción, frontend en el mismo origen, health checks, Bicep parametrizado, job separado de migración y workflows CI/CD inicialmente deshabilitados. Ver `docs/phase3a-validation.md`.
-- **Fase 3B pendiente:** cotizar y crear los recursos reales, configurar OIDC/Environments/Auth0/Key Vault, ejecutar la primera migración y medir el despliegue. No iniciarla automáticamente.
+- **Fase 3B.1 completada:** red privada PostgreSQL, permisos de bootstrap, costos, OIDC, Auth0 y procedimiento están revisados en `docs/phase3b-preflight.md`.
+- **Fase 3B.2 en aprobación final:** solo existe el grupo vacío `rg-gameproj-dev`. La validación ARM y el what-if en `northcentralus` aprobaron 19 creaciones del ambiente dev, sin eliminaciones ni modificaciones. Falta autorización para desplegar recursos facturables.
 
 ## A. Completar y verificar el servidor local
 

@@ -60,7 +60,7 @@ jobs:
           az deployment group validate --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
           --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
           auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          deployData=false deployApplication=false
+          deployRoleAssignments=false deployData=false deployApplication=false
       - name: Build and publish immutable image
         run: |
           az acr login --name '${{ vars.ACR_NAME }}'
@@ -71,7 +71,7 @@ jobs:
           az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
           --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
           auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          imageTag="$IMAGE_TAG" deployData=false deployApplication=false
+          imageTag="$IMAGE_TAG" deployRoleAssignments=false deployData=false deployApplication=false
       - name: Run one controlled migration job
         shell: bash
         run: |
@@ -88,7 +88,7 @@ jobs:
           az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
           --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
           auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          imageTag="$IMAGE_TAG" deployData=false deployApplication=true
+          imageTag="$IMAGE_TAG" deployRoleAssignments=false deployData=false deployApplication=true
       - name: Verify readiness and record deployed revision
         shell: bash
         run: |

@@ -178,3 +178,7 @@ Los endpoints operativos son:
 `infra/main.bicep` declara Container Apps, su environment, ACR Basic, PostgreSQL Flexible Server 17, Key Vault, identidad administrada, Log Analytics y Application Insights. Los parámetros de dev y prod son ejemplos sin secretos y dejan la creación de datos, job y aplicación deshabilitada. La configuración inicial mantiene exactamente una réplica. El job manual ejecuta `Game.Database migrate` antes de desplegar una nueva revisión; el servidor nunca migra al arrancar.
 
 CI está en `.github/workflows/ci.yml`. CD está en `.github/workflows/cd.yml` y no realiza ninguna operación Azure mientras `AZURE_DEPLOY_ENABLED` no sea `true`; usa OIDC y ambientes GitHub separados. La preparación, los límites y los pasos exactos para 3B están en [el informe de Fase 3A](docs/phase3a-validation.md), y el cálculo de gasto está en [costos Azure](docs/azure-costs.md).
+
+El preflight local de Fase 3B.1, las correcciones de red privada y la secuencia de bootstrap están en [docs/phase3b-preflight.md](docs/phase3b-preflight.md). En esa subfase la validación quedó bloqueada hasta instalar Azure CLI; la cuenta ya se comprobó durante 3B.2.
+
+La revisión de Fase 3B.2 creó únicamente el grupo vacío `rg-gameproj-dev`. Azure for Students rechazó `eastus2` y `centralus`; la validación ARM y el what-if en `northcentralus` aprobaron 19 creaciones dev, sin cambios destructivos. El plan, costos y comandos están en [docs/phase3b-deployment.md](docs/phase3b-deployment.md); el despliegue facturable requiere aprobación final.

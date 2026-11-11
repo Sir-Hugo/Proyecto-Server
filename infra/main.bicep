@@ -5,7 +5,7 @@ targetScope = 'resourceGroup'
 param namePrefix string
 @allowed(['dev', 'prod'])
 param environmentName string
-param location string = resourceGroup().location
+param location string
 param imageRepository string = 'game-server'
 param imageTag string = 'bootstrap'
 param auth0Authority string
@@ -24,6 +24,16 @@ param postgresStorageGb int = 32
 param postgresAdministratorLogin string = 'gameadmin'
 @secure()
 param postgresAdministratorPassword string = ''
+param vnetAddressPrefix string = '10.20.0.0/16'
+param containerAppsSubnetPrefix string = '10.20.0.0/27'
+param postgresSubnetPrefix string = '10.20.1.0/28'
+@minValue(1)
+param monthlyBudgetAmount int = 20
+param budgetContactEmail string
+param budgetStartDate string = '2026-11-01T00:00:00Z'
+param budgetEndDate string = '2027-11-01T00:00:00Z'
+param deployBudget bool = true
+param deployRoleAssignments bool = true
 param deployData bool = false
 param deployMigrationJob bool = false
 param deployApplication bool = false
@@ -34,7 +44,106 @@ var registryName = take('${compact}gameacr', 50)
 var vaultName = take('${compact}kv', 24)
 var postgresName = take('${suffix}-pg-${uniqueString(resourceGroup().id)}', 63)
 var appName = '${suffix}-app'
+var containerAppsSubnetName = 'container-apps'
+var postgresSubnetName = 'postgresql'
+var privateDnsZoneName = '${suffix}.postgres.database.azure.com'
 var tags = { project: 'proyecto-server', environment: environmentName, managedBy: 'bicep' }
+
+resource budget 'Microsoft.Consumption/budgets@2024-08-01' = if (deployBudget) {
+  name: '${suffix}-monthly-budget'
+  properties: {
+    amount: monthlyBudgetAmount
+    category: 'Cost'
+    timeGrain: 'Monthly'
+    timePeriod: {
+      startDate: budgetStartDate
+      endDate: budgetEndDate
+    }
+    notifications: {
+      Actual_GreaterThanOrEqualTo_50_Percent: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 50
+        thresholdType: 'Actual'
+        contactEmails: [budgetContactEmail]
+        contactGroups: []
+        contactRoles: ['Owner']
+        locale: 'es-es'
+      }
+      Actual_GreaterThanOrEqualTo_75_Percent: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 75
+        thresholdType: 'Actual'
+        contactEmails: [budgetContactEmail]
+        contactGroups: []
+        contactRoles: ['Owner']
+        locale: 'es-es'
+      }
+      Actual_GreaterThanOrEqualTo_90_Percent: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 90
+        thresholdType: 'Actual'
+        contactEmails: [budgetContactEmail]
+        contactGroups: []
+        contactRoles: ['Owner']
+        locale: 'es-es'
+      }
+      Actual_GreaterThanOrEqualTo_100_Percent: {
+        enabled: true
+        operator: 'GreaterThanOrEqualTo'
+        threshold: 100
+        thresholdType: 'Actual'
+        contactEmails: [budgetContactEmail]
+        contactGroups: []
+        contactRoles: ['Owner']
+        locale: 'es-es'
+      }
+    }
+  }
+}
+
+resource network 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: '${suffix}-vnet'
+  location: location
+  tags: tags
+  properties: { addressSpace: { addressPrefixes: [vnetAddressPrefix] } }
+}
+
+resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
+  parent: network
+  name: containerAppsSubnetName
+  properties: {
+    addressPrefix: containerAppsSubnetPrefix
+    delegations: [{ name: 'container-apps-delegation', properties: { serviceName: 'Microsoft.App/environments' } }]
+  }
+}
+
+resource postgresSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
+  parent: network
+  name: postgresSubnetName
+  properties: {
+    addressPrefix: postgresSubnetPrefix
+    delegations: [{ name: 'postgresql-delegation', properties: { serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers' } }]
+  }
+}
+
+resource postgresPrivateDns 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: privateDnsZoneName
+  location: 'global'
+  tags: tags
+}
+
+resource postgresPrivateDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: postgresPrivateDns
+  name: '${suffix}-vnet-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: { id: network.id }
+  }
+}
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   name: '${suffix}-logs'
@@ -80,7 +189,7 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployRoleAssignments) {
   name: guid(registry.id, identity.id, 'acrpull')
   scope: registry
   properties: {
@@ -90,7 +199,7 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-resource vaultReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource vaultReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployRoleAssignments) {
   name: guid(vault.id, identity.id, 'secrets-user')
   scope: vault
   properties: {
@@ -110,12 +219,16 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' = if (d
     administratorLoginPassword: postgresAdministratorPassword
     version: '17'
     authConfig: { activeDirectoryAuth: 'Disabled', passwordAuth: 'Enabled' }
-    availabilityZone: '1'
     backup: { backupRetentionDays: environmentName == 'prod' ? 14 : 7, geoRedundantBackup: 'Disabled' }
     highAvailability: { mode: 'Disabled' }
-    network: { publicNetworkAccess: 'Enabled' }
+    network: {
+      delegatedSubnetResourceId: postgresSubnet.id
+      privateDnsZoneArmResourceId: postgresPrivateDns.id
+      publicNetworkAccess: 'Disabled'
+    }
     storage: { autoGrow: 'Enabled', storageSizeGB: postgresStorageGb }
   }
+  dependsOn: [postgresPrivateDnsLink]
 }
 
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2025-08-01' = if (deployData) {
@@ -124,10 +237,12 @@ resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2025-08-0
   properties: { charset: 'UTF8', collation: 'en_US.utf8' }
 }
 
-resource azureServicesFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2025-08-01' = if (deployData) {
-  parent: postgres
-  name: 'AllowAzureServices'
-  properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
+resource postgresConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (deployData) {
+  parent: vault
+  name: 'postgres-connection'
+  properties: {
+    value: 'Host=${postgresName}.postgres.database.azure.com;Port=5432;Database=game;Username=${postgresAdministratorLogin};Password=${postgresAdministratorPassword};SSL Mode=VerifyFull;Include Error Detail=false'
+  }
 }
 
 resource containerEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
@@ -139,6 +254,11 @@ resource containerEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
       destination: 'log-analytics'
       logAnalyticsConfiguration: { customerId: logs.properties.customerId, sharedKey: logs.listKeys().primarySharedKey }
     }
+    vnetConfiguration: {
+      infrastructureSubnetId: containerAppsSubnet.id
+      internal: false
+    }
+    workloadProfiles: [{ name: 'Consumption', workloadProfileType: 'Consumption' }]
   }
 }
 
@@ -180,7 +300,6 @@ resource app 'Microsoft.App/containerApps@2025-07-01' = if (deployApplication) {
       scale: { minReplicas: minReplicas, maxReplicas: maxReplicas }
     }
   }
-  dependsOn: [acrPull, vaultReader]
 }
 
 resource migrationJob 'Microsoft.App/jobs@2025-07-01' = if (deployMigrationJob || deployApplication) {
@@ -200,7 +319,6 @@ resource migrationJob 'Microsoft.App/jobs@2025-07-01' = if (deployMigrationJob |
     }
     template: { containers: [{ name: 'migrate', image: '${registry.properties.loginServer}/${imageRepository}:${imageTag}', command: ['dotnet'], args: ['/app/database/Game.Database.dll', 'migrate'], env: [{ name: 'ConnectionStrings__GameDatabase', secretRef: 'postgres-connection' }], resources: { cpu: json('0.25'), memory: '0.5Gi' } }] }
   }
-  dependsOn: [acrPull, vaultReader]
 }
 
 output registryName string = registry.name
@@ -209,4 +327,7 @@ output keyVaultName string = vault.name
 output postgresHost string = '${postgresName}.postgres.database.azure.com'
 output containerAppName string = appName
 output migrationJobName string = migrationJob.name
+output virtualNetworkName string = network.name
+output postgresNetworkMode string = 'Private access (VNet integration)'
+output monthlyBudgetName string = budget.name
 output publicUrl string = deployApplication ? 'https://${appName}.${containerEnvironment.properties.defaultDomain}' : ''
