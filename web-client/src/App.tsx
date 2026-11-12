@@ -473,10 +473,23 @@ function App() {
     // Determina el resultado de la partida y elige el título y la imagen correspondiente.
     const isDraw = matchSnapshot.winnerId === null
     const didWin = matchSnapshot.winnerId === matchSnapshot.you.playerId
+    const winnerIsHost = didWin ? matchSnapshot.you.isHost : matchSnapshot.opponent.isHost
+    const expiredWithoutPlans = isDraw && matchEndReason === 'inactivity'
     const resultTitle = isDraw
       ? matchEndReason === 'inactivity' ? 'Partida expirada' : 'Empate'
       : didWin ? 'Victoria' : 'Derrota'
-    const resultImage = isDraw ? '/assets/characters/drawnGame.png' : playerImage
+    const resultImage = expiredWithoutPlans
+      ? '/assets/characters/expiredMatch.jpg'
+      : isDraw
+        ? '/assets/characters/drawnGame.jpg'
+        : winnerIsHost
+          ? didWin ? '/assets/characters/hostVictory.png' : '/assets/characters/guestDefeat.png'
+          : didWin ? '/assets/characters/guestVictory.png' : '/assets/characters/hostDefeat.png'
+    const resultImageAlt = expiredWithoutPlans
+      ? 'Ilustración de partida expirada'
+      : isDraw
+        ? 'Ilustración de empate'
+        : didWin ? 'Ilustración de victoria' : 'Ilustración de derrota'
     const resultDescription = matchEndReason === 'abandonment'
       ? didWin ? 'Ganaste porque tu rival abandonó la partida' : 'Perdiste porque abandonaste la partida'
       : matchEndReason === 'inactivity' ? 'La partida finalizó por inactividad.' : null
@@ -486,7 +499,7 @@ function App() {
           <p className="eyebrow">PARTIDA FINALIZADA</p>
           <h1 id="match-result-title">{resultTitle}</h1>
           {resultDescription && <p className="match-result-description">{resultDescription}</p>}
-          <img className="match-result-image" src={resultImage} alt={isDraw ? 'Ilustración de empate' : didWin ? 'Personaje ganador' : 'Personaje ganador de la partida'} />
+          <img className="match-result-image" src={resultImage} alt={resultImageAlt} />
           {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} · recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} · ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
           <div className="lobby-return-wrap"><button className="text-button lobby-return" onClick={returnToLobby}>Volver al lobby</button></div>
         </section>
@@ -537,7 +550,7 @@ function App() {
   return (
     <main className="auth-page">
       <section className="auth-card lobby-card">
-        <span className="brand-mark"><img src="/restIcon.jpg" alt="Emblema del juego" /></span>
+        <img className="lobby-banner" src="/banner.jpg" alt="Banner del juego" />
         <p className="eyebrow">Gentlemen lobby</p>
         <div className="lobby-content">
             <p className="supporting-text">Sesión iniciada{user?.name ? ` como ${user.name}` : ''}</p>
