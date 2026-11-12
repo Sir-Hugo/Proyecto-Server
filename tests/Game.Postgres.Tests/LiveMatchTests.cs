@@ -254,6 +254,8 @@ public sealed class LiveMatchTests(PostgresFixture fixture) : IClassFixture<Post
         var results=await Task.WhenAll(rooms.SetReadyAsync(created.Room.RoomId,game.Alice,true),rooms.SetReadyAsync(created.Room.RoomId,game.Alice,true));
         Assert.All(results,result=>Assert.True(result.IsSuccess));
         Assert.Single(results.Select(result=>result.Value!.MatchId).Distinct());Assert.NotNull(results[0].Value!.MatchId);
+        var repeated=await rooms.SetReadyAsync(created.Room.RoomId,game.Alice,true);Assert.True(repeated.IsSuccess);Assert.Equal(results[0].Value!.MatchId,repeated.Value!.MatchId);
+        Assert.Equal("match_already_started",(await rooms.SetReadyAsync(created.Room.RoomId,game.Alice,false)).ErrorCode);
         Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM matches"));Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players"));
     }
     [PostgresFact] public async Task QuickMatchPublishesOnlyAfterDurableCreation()

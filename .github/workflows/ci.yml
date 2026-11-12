@@ -33,8 +33,12 @@ jobs:
         working-directory: web-client
       - run: npm run lint
         working-directory: web-client
+      - run: npm test
+        working-directory: web-client
       - run: npm run build
         working-directory: web-client
+      - name: Build production container
+        run: docker build --pull --tag game-server:ci-${{ github.sha }} .
       - name: Validate Bicep compilation
         run: az bicep build --file infra/main.bicep --stdout > /dev/null
       - name: Validate workflow syntax
@@ -55,12 +59,23 @@ jobs:
           ASPNETCORE_URLS: http://127.0.0.1:5080
         run: |
           docker run -d --rm --name game-ci-postgres -e POSTGRES_DB=game -e POSTGRES_USER=game -e POSTGRES_PASSWORD=ci-only-password -p 55432:5432 postgres:17.11-bookworm
-          for _ in {1..30}; do docker exec game-ci-postgres pg_isready -U game -d game && break; sleep 1; done
+          postgres_ready=false
+          for _ in {1..30}; do
+            if docker exec game-ci-postgres pg_isready -U game -d game; then postgres_ready=true; break; fi
+            sleep 1
+          done
+          test "$postgres_ready" = true
           dotnet run --project tools/Game.Database --no-build --configuration Release -- migrate
-          dotnet run --project src/Game.Server --no-build --configuration Release > server.log 2>&1 &
+          dotnet run --project src/Game.Server --no-build --no-launch-profile --configuration Release > server.log 2>&1 &
           server_pid=$!
           trap 'kill $server_pid || true; docker stop game-ci-postgres || true' EXIT
-          for _ in {1..30}; do curl --fail --silent http://127.0.0.1:5080/health/ready && break; sleep 1; done
+          server_ready=false
+          for _ in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5080/health/ready; then server_ready=true; break; fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if [ "$server_ready" != true ]; then tail -n 200 server.log; exit 1; fi
           curl --fail --silent http://127.0.0.1:5080/openapi/v1.json --output openapi.json
           npx --yes @redocly/cli@2.77.0 lint openapi.json
           npx --yes @asyncapi/cli@6.3.0 validate docs/asyncapi.yaml
@@ -80,6 +95,7 @@ jobs:
   codeql:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -87,6 +103,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with: { dotnet-version: '10.0.x' }
       - uses: github/codeql-action/init@v4
-        with: { languages: csharp, javascript-typescript }
+        with:
+          languages: csharp,javascript-typescript
       - uses: github/codeql-action/autobuild@v4
       - uses: github/codeql-action/analyze@v4

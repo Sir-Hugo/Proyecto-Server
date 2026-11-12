@@ -77,8 +77,13 @@ public sealed class InMemoryRoomService(MatchRoundService rounds, NpgsqlDataSour
         {
             await using var connection = await source.OpenConnectionAsync(ct); await using var tx = await connection.BeginTransactionAsync(ct); RoomData? room = Load(id, connection, tx, true);
             if (room is null || room.DbStatus == "closed") return RoomOperationResult<RoomResponse>.Failure(404, "room_not_found");
-            if (room.MatchId is not null) return RoomOperationResult<RoomResponse>.Failure(409, "match_already_started");
             if (!room.Members.Any(m => m.Subject == subject)) return RoomOperationResult<RoomResponse>.Failure(403, "room_membership_required");
+            // A retried ready=true may arrive after another concurrent request committed the match.
+            // Return the durable room/match assignment so the operation remains idempotent.
+            if (room.MatchId is not null)
+                return ready
+                    ? RoomOperationResult<RoomResponse>.Success(ToResponse(room, subject))
+                    : RoomOperationResult<RoomResponse>.Failure(409, "match_already_started");
             await using (var update = new NpgsqlCommand("UPDATE room_members SET is_ready=$1 WHERE room_id=$2 AND auth_subject=$3", connection, tx))
             { update.Parameters.AddWithValue(ready); update.Parameters.AddWithValue(id); update.Parameters.AddWithValue(subject); await update.ExecuteNonQueryAsync(ct); }
             Touch(id, connection, tx); await tx.CommitAsync(ct);
