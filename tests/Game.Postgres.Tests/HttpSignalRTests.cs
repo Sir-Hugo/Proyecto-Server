@@ -92,6 +92,44 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(0L, await db.ScalarAsync<long>("SELECT count(*) FROM match_commands"));
     }
 
+    [PostgresFact] public async Task JwtValidationRejectsInvalidSignatureExpiredTokenAndWrongAudience()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString);
+        using var invalidSignature=app.Bearer(app.IssueToken("auth0|invalid-signature",signingKey:new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(64))));
+        using var expired=app.Bearer(app.IssueToken("auth0|expired",expires:DateTime.UtcNow.AddMinutes(-10)));
+        using var wrongAudience=app.Bearer(app.IssueToken("auth0|wrong-audience",audience:"another-api"));
+        using var wrongIssuer=app.Bearer(app.IssueToken("auth0|wrong-issuer",issuer:"https://attacker.invalid/"));
+        Assert.Equal(HttpStatusCode.Unauthorized,(await invalidSignature.GetAsync("/api/history")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await expired.GetAsync("/api/history")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await wrongAudience.GetAsync("/api/history")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await wrongIssuer.GetAsync("/api/history")).StatusCode);
+    }
+
+    [PostgresFact] public async Task HttpRateLimitPartitionsAuthenticatedAndAnonymousRequestsAndReturnsRetryAfter()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString,apiAuthenticatedLimit:2,apiAnonymousLimit:2);
+        using var anonymous=app.CreateClient();using var player=app.Player("auth0|rate-limited");
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/history")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/history")).StatusCode);
+        var anonymousLimited=await anonymous.GetAsync("/api/history");
+        Assert.Equal(HttpStatusCode.TooManyRequests,anonymousLimited.StatusCode);Assert.NotNull(anonymousLimited.Headers.RetryAfter);
+        (await player.GetAsync("/api/history")).EnsureSuccessStatusCode();
+        (await player.GetAsync("/api/history")).EnsureSuccessStatusCode();
+        var playerLimited=await player.GetAsync("/api/history");
+        Assert.Equal(HttpStatusCode.TooManyRequests,playerLimited.StatusCode);Assert.NotNull(playerLimited.Headers.RetryAfter);
+        var problem=await playerLimited.Content.ReadFromJsonAsync<JsonElement>();Assert.Equal("rate_limit_exceeded",problem.GetProperty("code").GetString());
+    }
+
+    [PostgresFact] public async Task HubInvocationRateLimitRejectsExcessPerConnection()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString,hubInvocationLimit:2);
+        await using var hub=app.Hub("auth0|hub-rate-limited");await hub.StartAsync();
+        var resume=new{type="match.resume",version=1,matchId=(Guid?)null,lastSequence=(long?)null};
+        for(int attempt=0;attempt<2;attempt++)
+            Assert.Contains("active_match_not_found",(await Assert.ThrowsAsync<Microsoft.AspNetCore.SignalR.HubException>(()=>hub.InvokeAsync("ResumeMatch",resume))).Message);
+        Assert.Contains("rate_limit_exceeded",(await Assert.ThrowsAsync<Microsoft.AspNetCore.SignalR.HubException>(()=>hub.InvokeAsync("ResumeMatch",resume))).Message);
+    }
+
     [PostgresFact] public async Task RestReportsProblemDetailsWithoutConfirmingFailedCreation()
     {
         await using var db = await fixture.CreateDatabaseAsync(); await using var app = new GameApplication(db.ConnectionString);
@@ -255,7 +293,8 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
 
     // Real ASP.NET authentication middleware, HTTP and SignalR; only the issuer/key are test-local.
     // Auth0 setup and secrets in the production app are never changed.
-    private sealed class GameApplication(string connectionString, SymmetricSecurityKey? sharedKey = null) : WebApplicationFactory<Program>
+    private sealed class GameApplication(string connectionString, SymmetricSecurityKey? sharedKey = null,
+        int? apiAuthenticatedLimit = null, int? apiAnonymousLimit = null, int? hubInvocationLimit = null) : WebApplicationFactory<Program>
     {
         private readonly SymmetricSecurityKey key = sharedKey ?? new(RandomNumberGenerator.GetBytes(64));
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -266,6 +305,12 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
             builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
             builder.UseSetting("Authentication:Authority", "https://identity.test/");
             builder.UseSetting("Authentication:Audience", "phase2b-tests");
+            if(apiAuthenticatedLimit is int authenticatedLimit)
+                builder.UseSetting("RateLimiting:Api:AuthenticatedPermitLimit",authenticatedLimit.ToString());
+            if(apiAnonymousLimit is int anonymousLimit)
+                builder.UseSetting("RateLimiting:Api:AnonymousPermitLimit",anonymousLimit.ToString());
+            if(hubInvocationLimit is int invocationLimit)
+                builder.UseSetting("RateLimiting:Hub:InvocationPermitLimit",invocationLimit.ToString());
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GameDatabase"] = connectionString,
@@ -288,17 +333,19 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
                 };
             }));
         }
-        private string Token(string subject,bool admin=false,string? role=null) => new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
-            issuer: "https://identity.test/", audience: "phase2b-tests", claims: Claims(subject,admin,role),
-            expires: DateTime.UtcNow.AddMinutes(10), signingCredentials: new(key, SecurityAlgorithms.HmacSha256)));
+        public string IssueToken(string subject,bool admin=false,string? role=null,string? issuer=null,string? audience=null,
+            DateTime? expires=null,SymmetricSecurityKey? signingKey=null) => new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+            issuer: issuer??"https://identity.test/", audience: audience??"phase2b-tests", claims: Claims(subject,admin,role),
+            expires: expires??DateTime.UtcNow.AddMinutes(10), signingCredentials: new(signingKey??key, SecurityAlgorithms.HmacSha256)));
         private static IEnumerable<Claim> Claims(string subject,bool admin,string? role)
         {
             yield return new Claim("sub",subject);if(admin)yield return new Claim("permissions","admin:game");if(role is not null)yield return new Claim("role",role);
         }
         public HttpClient Player(string subject,bool admin=false,string? role=null)
         {
-            var client = CreateClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject,admin,role)); return client;
+            return Bearer(IssueToken(subject,admin,role));
         }
+        public HttpClient Bearer(string token){var client=CreateClient();client.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",token);return client;}
         public HubConnection Hub(string subject)
         {
             // LongPolling runs through TestServer; no external listening ports or Auth0 calls.
@@ -307,7 +354,7 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
             {
                 options.Transports = HttpTransportType.LongPolling;
                 options.HttpMessageHandlerFactory = _ => Server.CreateHandler();
-                options.AccessTokenProvider = () => Task.FromResult<string?>(Token(subject));
+                options.AccessTokenProvider = () => Task.FromResult<string?>(IssueToken(subject));
             }).Build();
         }
     }

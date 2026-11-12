@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Game.Domain;
 using Game.Infrastructure;
+using Game.Server.Security;
 
 namespace Game.Server.History;
 
@@ -11,7 +12,8 @@ public static class HistoryEndpoints
 {
     public static IEndpointRouteBuilder MapHistoryEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var history=endpoints.MapGroup("/api/history").WithTags("History").RequireAuthorization();
+        var history=endpoints.MapGroup("/api/history").WithTags("History").RequireAuthorization()
+            .RequireRateLimiting(SecurityRateLimits.ApiPolicy);
         history.MapGet("",async(int? page,int? pageSize,ClaimsPrincipal user,PostgresGameManagementStore store,CancellationToken ct)=>
             Results.Ok(await store.GetHistoryAsync(Subject(user),page??1,pageSize??20,ct)))
             .WithName("GetMatchHistory").WithSummary("Lista de forma paginada las partidas del usuario autenticado.")

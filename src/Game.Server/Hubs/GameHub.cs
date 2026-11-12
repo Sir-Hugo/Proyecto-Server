@@ -17,8 +17,13 @@ public sealed class GameHub(MatchRoundService connectionTracker, ConnectionRegis
 {
     public override async Task OnConnectedAsync()
     {
-        connectionRegistry.Add(Context.ConnectionId, GetHumanSubject());
-        await base.OnConnectedAsync();
+        if (!connectionRegistry.TryAdd(Context.ConnectionId, GetHumanSubject()))
+        {
+            Context.Abort();
+            throw new HubException("connection_limit_exceeded");
+        }
+        try { await base.OnConnectedAsync(); }
+        catch { connectionRegistry.Remove(Context.ConnectionId); throw; }
     }
     public override Task OnDisconnectedAsync(Exception? exception)
     {

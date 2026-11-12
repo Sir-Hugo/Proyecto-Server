@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Game.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Game.Server.Security;
 
 namespace Game.Server.Administration;
 
@@ -12,7 +13,8 @@ public static class AdministrationEndpoints
     public const string Policy="GameAdministrator";
     public static IEndpointRouteBuilder MapAdministrationEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var admin=endpoints.MapGroup("/api/admin").WithTags("Administration").RequireAuthorization(Policy);
+        var admin=endpoints.MapGroup("/api/admin").WithTags("Administration").RequireAuthorization(Policy)
+            .RequireRateLimiting(SecurityRateLimits.ApiPolicy);
         admin.MapGet("/matches/active",async(int? limit,PostgresGameManagementStore store,CancellationToken ct)=>Results.Ok(await store.GetActiveMatchesAsync(limit??100,ct)))
             .WithName("AdminListActiveMatches").WithSummary("Lista partidas activas para operación administrativa.");
         admin.MapGet("/connections",(ConnectionRegistry registry)=>Results.Ok(registry.List()))

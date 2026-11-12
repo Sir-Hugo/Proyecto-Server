@@ -156,6 +156,12 @@ Los endpoints bajo `/api/admin` consultan partidas activas y conexiones de la in
 
 La implementación y su validación se describen en [docs/history-administration-validation.md](docs/history-administration-validation.md). Aplicarla en Azure requiere ejecutar primero la migración 004 mediante el Migration Job y luego desplegar una imagen nueva; estas operaciones no se realizan automáticamente.
 
+## Controles de seguridad
+
+Las rutas REST autenticadas aplican límites por `sub` y las solicitudes anónimas por la IP del par directo, sin confiar en headers reenviados. El proxy compartido solo agrupa intentos anónimos contra rutas protegidas: las rutas públicas de SPA, configuración y health checks no tienen esta política, y un JWT válido crea su partición por usuario antes de autorizar. El servidor devuelve HTTP 429 con `Retry-After` al exceder 120 solicitudes por minuto por usuario o 30 anónimas. SignalR limita el transporte, las invocaciones por conexión y cinco conexiones simultáneas por usuario. Estos contadores son locales a la instancia; el despliegue mantiene una sola réplica y necesita coordinación distribuida antes de escalar.
+
+Kestrel limita los cuerpos HTTP a 64 KiB y SignalR los mensajes a 8 KiB. Container Apps impone HTTPS/WSS mediante `allowInsecure=false`; el servidor no confía en forwarded headers ni redirige el HTTP interno posterior a la terminación TLS. Producción emite HSTS y todas las respuestas incluyen encabezados contra MIME sniffing, framing y filtración de referrer. Los valores se configuran bajo `Http` y `RateLimiting` en `appsettings.json`. La matriz completa, pruebas y limitaciones están en [docs/phase4a-security-validation.md](docs/phase4a-security-validation.md).
+
 ## Partidas consecutivas
 
 El cliente conserva en `localStorage` únicamente el identificador de una partida activa. Al completar una partida mantiene el resultado en pantalla, libera esa referencia activa y, al volver al lobby, descarta las referencias de navegación de la sala anterior. Los mensajes SignalR se validan por `matchId` y secuencia dentro de cada partida, de modo que una respuesta tardía de una partida terminada no puede reemplazar una partida nueva.
