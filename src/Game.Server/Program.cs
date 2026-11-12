@@ -36,6 +36,7 @@ builder.Services.AddGameRateLimiting(builder.Configuration);
 builder.Services.AddAuthorization(options => options.AddPolicy(AdministrationEndpoints.Policy, policy =>
     policy.RequireAuthenticatedUser().RequireClaim("permissions", "admin:game")));
 builder.Services.AddSingleton<ConnectionRegistry>();
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<HubInvocationRateLimitFilter>();
 builder.Services.AddSingleton<ICriticalHitSource, SecureCriticalHitSource>();
 builder.Services.AddSingleton<RoundResolver>();

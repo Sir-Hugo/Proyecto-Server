@@ -130,6 +130,20 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Contains("rate_limit_exceeded",(await Assert.ThrowsAsync<Microsoft.AspNetCore.SignalR.HubException>(()=>hub.InvokeAsync("ResumeMatch",resume))).Message);
     }
 
+    [PostgresFact] public async Task HubUserInvocationRateLimitSurvivesReconnect()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString,hubUserInvocationLimit:2);
+        var resume=new{type="match.resume",version=1,matchId=(Guid?)null,lastSequence=(long?)null};
+        await using(var first=app.Hub("auth0|reconnecting-rate-limited"))
+        {
+            await first.StartAsync();
+            for(int attempt=0;attempt<2;attempt++)
+                Assert.Contains("active_match_not_found",(await Assert.ThrowsAsync<Microsoft.AspNetCore.SignalR.HubException>(()=>first.InvokeAsync("ResumeMatch",resume))).Message);
+        }
+        await using var reconnected=app.Hub("auth0|reconnecting-rate-limited");await reconnected.StartAsync();
+        Assert.Contains("rate_limit_exceeded",(await Assert.ThrowsAsync<Microsoft.AspNetCore.SignalR.HubException>(()=>reconnected.InvokeAsync("ResumeMatch",resume))).Message);
+    }
+
     [PostgresFact] public async Task RestReportsProblemDetailsWithoutConfirmingFailedCreation()
     {
         await using var db = await fixture.CreateDatabaseAsync(); await using var app = new GameApplication(db.ConnectionString);
@@ -294,7 +308,8 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
     // Real ASP.NET authentication middleware, HTTP and SignalR; only the issuer/key are test-local.
     // Auth0 setup and secrets in the production app are never changed.
     private sealed class GameApplication(string connectionString, SymmetricSecurityKey? sharedKey = null,
-        int? apiAuthenticatedLimit = null, int? apiAnonymousLimit = null, int? hubInvocationLimit = null) : WebApplicationFactory<Program>
+        int? apiAuthenticatedLimit = null, int? apiAnonymousLimit = null, int? hubInvocationLimit = null,
+        int? hubUserInvocationLimit = null) : WebApplicationFactory<Program>
     {
         private readonly SymmetricSecurityKey key = sharedKey ?? new(RandomNumberGenerator.GetBytes(64));
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -311,6 +326,8 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
                 builder.UseSetting("RateLimiting:Api:AnonymousPermitLimit",anonymousLimit.ToString());
             if(hubInvocationLimit is int invocationLimit)
                 builder.UseSetting("RateLimiting:Hub:InvocationPermitLimit",invocationLimit.ToString());
+            if(hubUserInvocationLimit is int userInvocationLimit)
+                builder.UseSetting("RateLimiting:Hub:UserInvocationPermitLimit",userInvocationLimit.ToString());
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GameDatabase"] = connectionString,

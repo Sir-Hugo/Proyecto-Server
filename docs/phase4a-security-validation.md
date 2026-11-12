@@ -12,7 +12,7 @@ Fecha de validación: 12 de noviembre de 2026. Esta fase es exclusivamente local
 | Usuarios suspendidos | Implementado y probado | Middleware HTTP y filtro SignalR consultan la suspensión persistente. Hay regresión HTTP/Hub y auditoría append-only. |
 | Bypasses de producción | Implementado y probado | Producción exige Authority, Audience y Client ID; no existe esquema de autenticación de prueba en el servidor. |
 | Rate limiting HTTP | Implementado y probado | Ventana fija: 120 solicitudes/min por `sub`, 30/min por IP directa para anónimos; exceso devuelve 429, `Retry-After` y código estable. |
-| Rate limiting SignalR | Implementado y probado | 240 solicitudes de transporte/min por usuario, 60 invocaciones/10 s por conexión y máximo de 5 conexiones simultáneas por usuario. |
+| Rate limiting SignalR | Implementado y probado | 240 solicitudes de transporte/min por usuario, 60 invocaciones/10 s por conexión, 120 invocaciones/10 s por usuario y máximo de 5 conexiones simultáneas. El contador de usuario sobrevive reconexiones y expira por inactividad. |
 | Tamaño y validación de entradas | Implementado y probado | Cuerpo HTTP máximo 64 KiB, mensaje SignalR máximo 8 KiB, planes máximo 19 acciones, nickname y razones administrativas acotados. |
 | Manejo de errores | Implementado y probado | REST usa Problem Details/códigos estables y no expone conexión ni subjects. SignalR usa códigos breves de HubException documentados. |
 | CORS y origen WebSocket | Implementado y probado | Lista explícita `Cors:AllowedOrigins`, credenciales y orígenes WebSocket restringidos. |
@@ -35,7 +35,7 @@ Fecha de validación: 12 de noviembre de 2026. Esta fase es exclusivamente local
 ## Correcciones realizadas
 
 - Rate limiting HTTP por usuario o IP directa, con 429 y `Retry-After`.
-- Límite separado del transporte y de cada conexión SignalR, más máximo simultáneo por usuario.
+- Límites separados del transporte, de cada conexión y del usuario SignalR, más máximo simultáneo; reconectar no reinicia el contador por `sub`.
 - Eliminación de la confianza en `X-Forwarded-For` y `X-Forwarded-Proto`; HTTPS/WSS se impone en el ingress y HSTS se emite sin redirección interna.
 - Límite de 64 KiB para cuerpos HTTP y respuesta 413 estable.
 - HSTS en producción y encabezados defensivos sin cambiar el flujo Auth0.
@@ -43,14 +43,14 @@ Fecha de validación: 12 de noviembre de 2026. Esta fase es exclusivamente local
 
 ## Valores y rendimiento esperado
 
-Los límites permiten 120 solicitudes REST por minuto por usuario, 240 solicitudes de transporte SignalR por minuto, 60 invocaciones del Hub cada 10 segundos por conexión y cinco conexiones concurrentes por usuario. Son muy superiores al ritmo normal de un juego por turnos. El costo adicional es una consulta a un contador en memoria por solicitud/invocación y una búsqueda pequeña al conectar; no hay acceso adicional a PostgreSQL. Los contadores viven en cada réplica y no deben presentarse como límite global si se habilita escalado horizontal.
+Los límites permiten 120 solicitudes REST por minuto por usuario, 240 solicitudes de transporte SignalR por minuto, 60 invocaciones del Hub cada 10 segundos por conexión, 120 por usuario y cinco conexiones concurrentes. Son muy superiores al ritmo normal de un juego por turnos. El costo adicional es una consulta a contadores en memoria por solicitud/invocación y una búsqueda pequeña al conectar; no hay acceso adicional a PostgreSQL. Los contadores viven en cada réplica y no deben presentarse como límite global si se habilita escalado horizontal.
 
 ## Evidencia reproducible
 
 Resultado final:
 
 - Build .NET Release: correcto, 0 errores y 0 advertencias.
-- Pruebas .NET: 151/151 aprobadas; 98 usan PostgreSQL 17 real en Testcontainers.
+- Pruebas .NET: 152/152 aprobadas; 99 usan PostgreSQL 17 real en Testcontainers.
 - Frontend: 3/3 pruebas aprobadas.
 - ESLint y build Vite: correctos. Vite advierte que el bundle principal supera 500 KiB; corresponde a optimización de rendimiento, no a un fallo de seguridad.
 - NuGet: ninguna dependencia vulnerable reportada.
