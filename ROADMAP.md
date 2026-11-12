@@ -22,6 +22,7 @@ Esta ruta organiza el trabajo para terminar primero el servidor local, luego des
 - **Fase 3A implementada:** contenedor de producción, frontend en el mismo origen, health checks, Bicep parametrizado, job separado de migración y workflows CI/CD inicialmente deshabilitados. Ver `docs/phase3a-validation.md`.
 - **Fase 3B.1 completada:** red privada PostgreSQL, permisos de bootstrap, costos, OIDC, Auth0 y procedimiento están revisados en `docs/phase3b-preflight.md`.
 - **Fase 3B.2 desplegada:** Container App, PostgreSQL privado y migraciones 001–003 están saludables. Falta configurar las URLs definitivas de Auth0 y completar la prueba real de dos usuarios.
+- **Fase 6B verificada:** CI aprobó build, 152 pruebas .NET/PostgreSQL, frontend, Docker, contratos, Gitleaks y CodeQL. Fase 6C deja el CD manual preparado; aún faltan GitHub Environments, OIDC/RBAC y ejecutar un despliegue controlado.
 
 ## A. Completar y verificar el servidor local
 

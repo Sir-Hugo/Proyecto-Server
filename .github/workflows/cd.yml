@@ -1,98 +1,229 @@
-name: CD (disabled until configured)
+name: CD (manual and protected)
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
+      commit_sha:
+        description: Full 40-character SHA whose CI run succeeded
+        required: true
+        type: string
       environment:
+        description: Protected GitHub Environment containing the Azure variables
+        required: true
         type: choice
         options: [dev, prod]
         default: dev
-      deploy:
-        description: Confirm that Azure configuration and approvals are ready
+      migration_mode:
+        description: Keep skip unless a versioned migration is pending and separately approved
+        required: true
+        type: choice
+        options: [skip, run-once]
+        default: skip
+      migration_confirmation:
+        description: Type RUN MIGRATIONS only when migration_mode is run-once
+        required: false
+        type: string
+      confirm_deploy:
+        description: I approve publishing/deploying this exact commit to the selected environment
+        required: true
         type: boolean
         default: false
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
 concurrency:
-  group: deploy-${{ github.event.inputs.environment || 'dev' }}
+  group: deploy-${{ inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: >-
-      (github.event_name == 'push' && vars.AZURE_DEPLOY_ENABLED == 'true') ||
-      (github.event_name == 'workflow_dispatch' && inputs.deploy && vars.AZURE_DEPLOY_ENABLED == 'true')
+    if: ${{ inputs.confirm_deploy }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+    environment: ${{ inputs.environment }}
     env:
-      DEPLOY_ENV: ${{ github.event.inputs.environment || 'dev' }}
       RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-      IMAGE_TAG: ${{ github.sha }}
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+      MIGRATION_JOB_NAME: ${{ vars.MIGRATION_JOB_NAME }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: azure/login@v3
+      - name: Check out the approved commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Validate the selected commit
+        id: commit
+        shell: bash
+        env:
+          REQUESTED_SHA: ${{ inputs.commit_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          requested_sha_input="${REQUESTED_SHA:-}"
+          [[ "$requested_sha_input" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "commit_sha must contain 40 hexadecimal characters"; exit 1; }
+          requested_sha=$(printf '%s' "$requested_sha_input" | tr '[:upper:]' '[:lower:]')
+          checked_out_sha=$(git rev-parse HEAD)
+          test "$checked_out_sha" = "$requested_sha" || { echo "Checkout does not match commit_sha"; exit 1; }
+          test -z "$(git status --porcelain)" || { echo "Checkout is not clean"; exit 1; }
+
+          runs_url="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$requested_sha&status=success&per_page=100"
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "$runs_url" > ci-runs.json
+          jq --exit-status --arg sha "$requested_sha" \
+            '.workflow_runs | any(.head_sha == $sha and .status == "completed" and .conclusion == "success")' \
+            ci-runs.json > /dev/null || { echo "No successful CI run exists for the selected commit"; exit 1; }
+          rm ci-runs.json
+          echo "sha=$requested_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Validate deployment configuration
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          MIGRATION_MODE: ${{ inputs.migration_mode }}
+          MIGRATION_CONFIRMATION: ${{ inputs.migration_confirmation }}
+        run: |
+          set -euo pipefail
+          required=(AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID RESOURCE_GROUP ACR_NAME CONTAINER_APP_NAME)
+          for name in "${required[@]}"; do
+            test -n "${!name:-}" || { echo "Missing GitHub Environment variable: $name"; exit 1; }
+          done
+          if [ "$MIGRATION_MODE" = run-once ]; then
+            test -n "${MIGRATION_JOB_NAME:-}" || { echo "MIGRATION_JOB_NAME is required"; exit 1; }
+            test "$MIGRATION_CONFIRMATION" = 'RUN MIGRATIONS' || { echo "Explicit migration confirmation is missing"; exit 1; }
+          fi
+
+      - name: Authenticate to Azure using OIDC
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Validate required deployment variables
+
+      - name: Inspect current deployment and registry
+        id: preflight
         shell: bash
-        run: |
-          required=(RESOURCE_GROUP AZURE_LOCATION NAME_PREFIX ACR_NAME CONTAINER_APP_NAME MIGRATION_JOB_NAME AUTH0_AUTHORITY AUTH0_AUDIENCE AUTH0_CLIENT_ID)
-          for name in "${required[@]}"; do test -n "${!name:-}" || { echo "Missing GitHub environment variable: $name"; exit 1; }; done
         env:
-          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-          NAME_PREFIX: ${{ vars.NAME_PREFIX }}
-          ACR_NAME: ${{ vars.ACR_NAME }}
-          CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
-          MIGRATION_JOB_NAME: ${{ vars.MIGRATION_JOB_NAME }}
-          AUTH0_AUTHORITY: ${{ vars.AUTH0_AUTHORITY }}
-          AUTH0_AUDIENCE: ${{ vars.AUTH0_AUDIENCE }}
-          AUTH0_CLIENT_ID: ${{ vars.AUTH0_CLIENT_ID }}
-      - name: Validate Bicep against Azure
-        run: >-
-          az deployment group validate --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
-          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
-          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          deployRoleAssignments=false deployData=false deployApplication=false
-      - name: Build and publish immutable image
+          APPROVED_SHA: ${{ steps.commit.outputs.sha }}
         run: |
-          az acr login --name '${{ vars.ACR_NAME }}'
-          docker build --pull --tag '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG" .
-          docker push '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG"
-      - name: Apply shared infrastructure without changing application revision
-        run: >-
-          az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
-          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
-          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          imageTag="$IMAGE_TAG" deployRoleAssignments=false deployData=false deployApplication=false
-      - name: Run one controlled migration job
+          set -euo pipefail
+          test "$(az acr show --resource-group "$RESOURCE_GROUP" --name "$ACR_NAME" --query adminUserEnabled -o tsv)" = false
+          acr_server=$(az acr show --resource-group "$RESOURCE_GROUP" --name "$ACR_NAME" --query loginServer -o tsv)
+          previous_image=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --query 'properties.template.containers[0].image' -o tsv)
+          test -n "$previous_image"
+          existing_digest=$(az acr repository show --name "$ACR_NAME" --image "game-server:$APPROVED_SHA" --query digest -o tsv 2>/dev/null || true)
+          {
+            echo "acr_server=$acr_server"
+            echo "previous_image=$previous_image"
+            echo "existing_digest=$existing_digest"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish the immutable commit image
+        if: ${{ steps.preflight.outputs.existing_digest == '' }}
         shell: bash
+        env:
+          APPROVED_SHA: ${{ steps.commit.outputs.sha }}
+          ACR_SERVER: ${{ steps.preflight.outputs.acr_server }}
         run: |
-          az containerapp job update --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --image '${{ vars.ACR_NAME }}.azurecr.io/game-server:'"$IMAGE_TAG"
-          execution=$(az containerapp job start --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --query name -o tsv)
+          set -euo pipefail
+          az acr login --name "$ACR_NAME"
+          image="$ACR_SERVER/game-server:$APPROVED_SHA"
+          docker build --pull --label "org.opencontainers.image.revision=$APPROVED_SHA" --tag "$image" .
+          docker push "$image"
+
+      - name: Resolve and verify the remote digest
+        id: image
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ steps.commit.outputs.sha }}
+          ACR_SERVER: ${{ steps.preflight.outputs.acr_server }}
+        run: |
+          set -euo pipefail
+          digest=$(az acr repository show --name "$ACR_NAME" --image "game-server:$APPROVED_SHA" --query digest -o tsv)
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "ACR did not return a valid manifest digest"; exit 1; }
+          image_ref="$ACR_SERVER/game-server@$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Run one separately approved migration execution
+        if: ${{ inputs.migration_mode == 'run-once' }}
+        shell: bash
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          active=$(az containerapp job execution list --resource-group "$RESOURCE_GROUP" --name "$MIGRATION_JOB_NAME" --query "[?properties.status=='Running'] | length(@)" -o tsv)
+          test "$active" = 0 || { echo "A migration execution is already active"; exit 1; }
+          az containerapp job update --resource-group "$RESOURCE_GROUP" --name "$MIGRATION_JOB_NAME" --image "$IMAGE_REF" > /dev/null
+          execution=$(az containerapp job start --resource-group "$RESOURCE_GROUP" --name "$MIGRATION_JOB_NAME" --query name -o tsv)
+          test -n "$execution"
+          status=''
           for _ in {1..90}; do
-            status=$(az containerapp job execution show --resource-group "$RESOURCE_GROUP" --name '${{ vars.MIGRATION_JOB_NAME }}' --job-execution-name "$execution" --query properties.status -o tsv)
-            case "$status" in Succeeded) break ;; Failed) echo "Migration failed"; exit 1 ;; esac
+            status=$(az containerapp job execution show --resource-group "$RESOURCE_GROUP" --name "$MIGRATION_JOB_NAME" --job-execution-name "$execution" --query properties.status -o tsv)
+            case "$status" in Succeeded) break ;; Failed) echo "Migration execution failed: $execution"; exit 1 ;; esac
             sleep 10
           done
-          test "$status" = Succeeded
-      - name: Deploy the commit image
-        run: >-
-          az deployment group create --resource-group "$RESOURCE_GROUP" --template-file infra/main.bicep
-          --parameters namePrefix='${{ vars.NAME_PREFIX }}' environmentName="$DEPLOY_ENV" location='${{ vars.AZURE_LOCATION }}'
-          auth0Authority='${{ vars.AUTH0_AUTHORITY }}' auth0Audience='${{ vars.AUTH0_AUDIENCE }}' auth0ClientId='${{ vars.AUTH0_CLIENT_ID }}'
-          imageTag="$IMAGE_TAG" deployRoleAssignments=false deployData=false deployApplication=true
-      - name: Verify readiness and record deployed revision
+          test "$status" = Succeeded || { echo "Migration execution timed out: $execution"; exit 1; }
+
+      - name: Deploy only the verified image digest
         shell: bash
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
         run: |
-          fqdn=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name '${{ vars.CONTAINER_APP_NAME }}' --query properties.configuration.ingress.fqdn -o tsv)
-          for _ in {1..30}; do curl --fail --silent --show-error "https://$fqdn/health/ready" && break; sleep 10; done
-          curl --fail --silent --show-error "https://$fqdn/health/ready"
-          az containerapp revision list --resource-group "$RESOURCE_GROUP" --name '${{ vars.CONTAINER_APP_NAME }}' --query "[?properties.active].{revision:name,image:properties.template.containers[0].image,created:properties.createdTime}" -o table
+          set -euo pipefail
+          az containerapp update --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --image "$IMAGE_REF" > /dev/null
+
+      - name: Verify revision, image and health endpoints
+        id: verify
+        shell: bash
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          test "$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --query properties.provisioningState -o tsv)" = Succeeded
+          deployed_image=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --query 'properties.template.containers[0].image' -o tsv)
+          test "$deployed_image" = "$IMAGE_REF" || { echo "Container App does not use the verified digest"; exit 1; }
+          fqdn=$(az containerapp show --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" --query properties.configuration.ingress.fqdn -o tsv)
+          test -n "$fqdn"
+          ready=false
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error "https://$fqdn/health/live" > /dev/null \
+              && curl --fail --silent --show-error "https://$fqdn/health/ready" > /dev/null; then ready=true; break; fi
+            sleep 10
+          done
+          test "$ready" = true || { echo "Health verification timed out"; exit 1; }
+          revision=$(az containerapp revision list --resource-group "$RESOURCE_GROUP" --name "$CONTAINER_APP_NAME" \
+            --query "[?properties.active && properties.template.containers[0].image=='$IMAGE_REF'] | [0].name" -o tsv)
+          test -n "$revision" || { echo "No active revision uses the verified digest"; exit 1; }
+          echo "fqdn=$fqdn" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Record deployment and rollback references
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ steps.commit.outputs.sha }}
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          PREVIOUS_IMAGE: ${{ steps.preflight.outputs.previous_image }}
+          REVISION: ${{ steps.verify.outputs.revision }}
+          FQDN: ${{ steps.verify.outputs.fqdn }}
+          MIGRATION_MODE: ${{ inputs.migration_mode }}
+        run: |
+          tick=$(printf '\140')
+          {
+            echo '### Deployment result'
+            printf -- '- Commit: %s%s%s\n' "$tick" "$APPROVED_SHA" "$tick"
+            printf -- '- Image: %s%s%s\n' "$tick" "$IMAGE_REF" "$tick"
+            printf -- '- Revision: %s%s%s\n' "$tick" "$REVISION" "$tick"
+            echo "- URL: https://$FQDN"
+            printf -- '- Previous image retained for rollback: %s%s%s\n' "$tick" "$PREVIOUS_IMAGE" "$tick"
+            printf -- '- Migration mode: %s%s%s\n' "$tick" "$MIGRATION_MODE" "$tick"
+          } >> "$GITHUB_STEP_SUMMARY"
