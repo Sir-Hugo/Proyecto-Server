@@ -4,8 +4,9 @@ info:
   version: 1.0.0
   description: >-
     Real-time contract for the game server. Payloads are application-level
-    messages carried through the authenticated SignalR hub. Every payload has a
-    type and a separate numeric version. Match events are recipient-specific;
+    messages carried through the authenticated SignalR hub. Versioned envelopes
+    carry a type and a separate numeric version; AbandonMatch currently accepts
+    a bare matchId UUID. Match events are recipient-specific;
     resolved-round messages disclose outcomes but never the opponent's action list.
     Match changes are confirmed in PostgreSQL before notifications are sent.
     Durable notifications use an at-least-once transactional outbox; clients discard
@@ -31,11 +32,14 @@ channels:
       application data inside SignalR, not SignalR's framing protocol. The server
       rejects incoming hub messages larger than 8192 bytes (8 KiB).
     x-signalr-maximum-receive-message-size: 8192
+    x-signalr-connection-errors: [unauthorized, connection_limit_exceeded]
     messages:
       submitRoundPlan:
         $ref: '#/components/messages/SubmitRoundPlan'
       syncMatchState:
         $ref: '#/components/messages/SyncMatchState'
+      abandonMatch:
+        $ref: '#/components/messages/AbandonMatch'
       joinMatchmakingQueue:
         $ref: '#/components/messages/JoinMatchmakingQueue'
       cancelMatchmakingQueue:
@@ -79,13 +83,16 @@ operations:
       - $ref: '#/channels/gameHub/messages/submitRoundPlan'
     summary: Submit all actions for the current simultaneous round.
     x-signalr-invocation-errors:
-      - invalid_message
+      - 'invalid_message:<validation-issue>'
+      - human_user_token_required
+      - user_suspended
+      - rate_limit_exceeded
       - not_match_participant
       - match_completed
       - nicknames_required
       - stale_sequence
       - round_plan_already_submitted
-      - invalid_round_plan
+      - 'invalid_round_plan:rules_violation'
       - idempotency_key_reused
       - database_unavailable
   syncMatchState:
@@ -94,9 +101,18 @@ operations:
       $ref: '#/channels/gameHub'
     messages:
       - $ref: '#/channels/gameHub/messages/syncMatchState'
-    summary: Request an authorized player-specific snapshot and resume real-time delivery.
+    summary: Discover or resume an authorized match; the server sends a full snapshot and pending outbox messages.
     x-signalr-method: ResumeMatch
-    x-signalr-invocation-errors: [invalid_message, active_match_not_found, not_match_participant, database_unavailable]
+    x-signalr-invocation-errors: [invalid_message, active_match_not_found, not_match_participant, human_user_token_required, user_suspended, rate_limit_exceeded, database_unavailable]
+  abandonMatch:
+    action: receive
+    channel:
+      $ref: '#/channels/gameHub'
+    messages:
+      - $ref: '#/channels/gameHub/messages/abandonMatch'
+    summary: Forfeit the active match; the other participant wins.
+    x-signalr-method: AbandonMatch
+    x-signalr-invocation-errors: [invalid_match_id, not_match_participant, match_completed, human_user_token_required, user_suspended, rate_limit_exceeded, database_unavailable]
   joinMatchmakingQueue:
     action: receive
     channel:
@@ -104,7 +120,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/joinMatchmakingQueue'
     summary: Join the quick-match queue.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required, player_already_in_match, database_unavailable]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, user_suspended, rate_limit_exceeded, player_already_in_match, database_unavailable]
   cancelMatchmakingQueue:
     action: receive
     channel:
@@ -112,7 +128,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/cancelMatchmakingQueue'
     summary: Leave the quick-match queue.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, user_suspended, rate_limit_exceeded]
   setMatchNickname:
     action: receive
     channel:
@@ -126,6 +142,9 @@ operations:
       - match_completed
       - invalid_nickname
       - nickname_already_set
+      - human_user_token_required
+      - user_suspended
+      - rate_limit_exceeded
       - database_unavailable
   joinMatch:
     action: receive
@@ -134,7 +153,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/joinMatch'
     summary: Join the match and receive a player-specific state snapshot.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required, not_match_participant, database_unavailable]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, user_suspended, rate_limit_exceeded, not_match_participant, database_unavailable]
   joinRoom:
     action: receive
     channel:
@@ -142,7 +161,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/joinRoom'
     summary: Subscribe to start notifications for a room the caller belongs to.
-    x-signalr-invocation-errors: [invalid_message, human_user_token_required, room_membership_required]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, user_suspended, rate_limit_exceeded, room_membership_required]
   leaveRoom:
     action: receive
     channel:
@@ -150,7 +169,7 @@ operations:
     messages:
       - $ref: '#/channels/gameHub/messages/leaveRoom'
     summary: Leave the room's SignalR notification group.
-    x-signalr-invocation-errors: [invalid_message]
+    x-signalr-invocation-errors: [invalid_message, human_user_token_required, user_suspended, rate_limit_exceeded]
   sendRoundPlanAccepted:
     action: send
     channel:
@@ -304,7 +323,13 @@ components:
               description: Null asks PostgreSQL for the participant's latest match.
             lastSequence:
               type: [integer, 'null']
+              format: int64
               minimum: 0
+              description: Client's last observed sequence; currently accepted but not used for delta filtering.
+    AbandonMatch:
+      type: string
+      format: uuid
+      description: Bare matchId argument passed to the AbandonMatch SignalR method.
     JoinMatchmakingQueue:
       allOf:
         - $ref: '#/components/schemas/RequestEnvelope'
@@ -397,10 +422,11 @@ components:
               format: uuid
             sequence:
               type: integer
+              format: int64
               minimum: 0
     PlayerMatchView:
       type: object
-      required: [playerId, health, nickname, isHost]
+      required: [playerId, health, nickname, isHost, energy, usedBlockades, hasUsedSpecialAttack]
       properties:
         playerId:
           type: string
@@ -447,6 +473,7 @@ components:
               format: uuid
             sequence:
               type: integer
+              format: int64
               minimum: 0
             roundNumber:
               type: integer
@@ -490,7 +517,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Envelope'
         - type: object
-          required: [type, version, matchId, sequence, roundNumber, yourDamage, opponentDamage, yourCriticalHits, opponentCriticalHits, yourAttacksBlocked, opponentAttacksBlocked, status, you, opponent]
+          required: [type, version, matchId, sequence, roundNumber, yourDamage, opponentDamage, yourCriticalHits, opponentCriticalHits, yourAttacksBlocked, opponentAttacksBlocked, status, winnerId, hasSubmittedPlan, roundDeadlineAt, terminalReason, you, opponent]
           properties:
             type:
               type: string
@@ -503,12 +530,13 @@ components:
               format: uuid
             sequence:
               type: integer
+              format: int64
               minimum: 0
             roundNumber:
               type: integer
               minimum: 1
               maximum: 10
-              description: The round whose actions were resolved; the state may already be ready for the next round.
+              description: The round just resolved; the state may already be ready for the next round.
             yourDamage:
               type: integer
               minimum: 0
@@ -533,6 +561,16 @@ components:
             winnerId:
               type: [string, 'null']
               format: uuid
+            hasSubmittedPlan:
+              type: boolean
+              const: false
+            roundDeadlineAt:
+              type: [string, 'null']
+              format: date-time
+            terminalReason:
+              type: [string, 'null']
+              enum: [null, completed]
+              description: Null while active; completed when this round ended the match by game rules.
             you:
               $ref: '#/components/schemas/PlayerMatchView'
             opponent:
@@ -569,6 +607,7 @@ components:
               format: uuid
             sequence:
               type: integer
+              format: int64
               minimum: 0
             roundNumber:
               type: integer
@@ -584,7 +623,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Envelope'
         - type: object
-          required: [type, version, matchId, sequence, roundNumber, reason, status, winnerId, you, opponent]
+          required: [type, version, matchId, sequence, roundNumber, reason, status, winnerId, hasSubmittedPlan, roundDeadlineAt, terminalReason, you, opponent]
           properties:
             type:
               type: string
@@ -597,6 +636,7 @@ components:
               format: uuid
             sequence:
               type: integer
+              format: int64
               minimum: 0
             roundNumber:
               type: integer
@@ -612,6 +652,14 @@ components:
               type: string
               enum: [inactivity, abandonment]
               description: The match ended because of inactivity or voluntary abandonment.
+            hasSubmittedPlan:
+              type: boolean
+              const: false
+            roundDeadlineAt:
+              type: 'null'
+            terminalReason:
+              type: string
+              enum: [inactivity, abandonment]
             you:
               $ref: '#/components/schemas/PlayerMatchView'
             opponent:
@@ -774,8 +822,8 @@ components:
             expectedSequence: 4
             actions: [Attack]
     SyncMatchState:
-      name: match.state.sync
-      title: Synchronize match state
+      name: match.resume
+      title: Resume match state
       description: Implemented by ResumeMatch; authentication determines the participant and private view.
       payload:
         $ref: '#/components/schemas/SyncMatchState'
@@ -786,6 +834,15 @@ components:
             version: 1
             matchId: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
             lastSequence: 4
+    AbandonMatch:
+      name: AbandonMatch
+      title: Abandon match
+      description: SignalR invocation payload is the matchId UUID itself, without a versioned envelope.
+      payload:
+        $ref: '#/components/schemas/AbandonMatch'
+      examples:
+        - name: forfeit
+          payload: 4a50ef7a-3460-4a40-904f-ced4fb15ce0f
     JoinMatchmakingQueue:
       name: matchmaking.queue.join
       title: Join quick-match queue
@@ -836,6 +893,9 @@ components:
             roundNumber: 3
             status: active
             winnerId: null
+            hasSubmittedPlan: false
+            roundDeadlineAt: '2026-11-07T18:31:00Z'
+            terminalReason: null
             you:
               playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
               isHost: true
@@ -871,6 +931,9 @@ components:
             opponentAttacksBlocked: 1
             status: active
             winnerId: null
+            hasSubmittedPlan: false
+            roundDeadlineAt: '2026-11-07T18:32:00Z'
+            terminalReason: null
             you:
               playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
               isHost: true
@@ -916,6 +979,9 @@ components:
             reason: inactivity
             status: completed
             winnerId: null
+            hasSubmittedPlan: false
+            roundDeadlineAt: null
+            terminalReason: inactivity
             you:
               playerId: ffa0a0f1-25e3-4811-9003-9d20560c179e
               isHost: true
