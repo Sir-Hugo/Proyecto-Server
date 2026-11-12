@@ -501,7 +501,7 @@ function App() {
           {resultDescription && <p className="match-result-description">{resultDescription}</p>}
           <img className="match-result-image" src={resultImage} alt={resultImageAlt} />
           {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} · recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} · ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
-          <div className="lobby-return-wrap"><button className="text-button lobby-return" onClick={returnToLobby}>Volver al lobby</button></div>
+          <div className="lobby-return-wrap"><button className="text-button lobby-return" onClick={returnToLobby} aria-label="Volver al lobby" title="Volver al lobby"><span className="lobby-return-icon" aria-hidden="true">🏰</span></button></div>
         </section>
       </main>
     }

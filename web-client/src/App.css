@@ -38,6 +38,11 @@
   width: min(100%, 620px);
 }
 
+.auth-card.lobby-card:not(.match-card) {
+  border: 3px solid #3d4245;
+  box-shadow: 0 0 0 1px #887753, 0 20px 55px rgba(30, 55, 80, 0.1);
+}
+
 .lobby-content {
   margin-top: 14px;
   text-align: left;
@@ -56,7 +61,8 @@
   border-radius: 16px;
   background: var(--color-sky);
   color: var(--color-blue);
-  font-size: 25px;
+  font-size: 32px;
+  line-height: 1;
   font-weight: 750;
   overflow: hidden;
 }
@@ -243,7 +249,7 @@
   margin-top: 12px;
 }
 
-.match-page .submit-plan-button { display: block; width: min(100%, 520px); margin: 12px auto 0; }
+.match-page .submit-plan-button { display: block; width: min(100%, 460px); margin: 12px auto 0; }
 .match-page .plan-pending-message { margin-top: 10px; }
 
 .round-result {
@@ -264,16 +270,29 @@
 }
 
 .lobby-return {
-  display: block;
+  display: grid;
+  width: 54px;
+  height: 48px;
+  place-items: center;
+  overflow: hidden;
   margin: 0 auto;
-  padding: 8px 17px;
+  padding: 0;
   border: 1px solid #8b7147;
   border-radius: 7px;
   background: linear-gradient(135deg, #4b4335, #302e2a);
   color: #ead8b5;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 13px;
+  font-size: 0;
   letter-spacing: 0.02em;
+}
+
+.lobby-return-icon {
+  display: block;
+  font-size: 35px;
+  line-height: 1;
+  max-width: 100%;
+  max-height: 100%;
+  transform: translateX(-6px);
 }
 
 .lobby-return-wrap {
@@ -650,7 +669,7 @@
 .match-connection { display: inline-flex; align-items: center; gap: 7px; color: #c1b7a5; font-size: 12px; }
 .match-connection .status-dot { width: 8px; height: 8px; }
 .fighter-placeholder.fighter-image {
-  width: clamp(150px, 18vw, 210px);
+  width: clamp(135px, 16vw, 190px);
   aspect-ratio: 1;
   overflow: visible;
   border: 0;
@@ -754,7 +773,7 @@
 
 @media (max-width: 700px) {
   .battlefield { grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr); gap: 8px; padding: 20px 10px; }
-  .fighter-placeholder { width: min(100%, 128px); }
+  .battlefield .fighter-placeholder.fighter-image { width: min(100%, 118px); }
   .actions-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .actions-bar .action-row { min-height: 118px; }
 }
@@ -772,6 +791,6 @@
 .match-result-card .round-result { margin: 12px 0 0; }
 .match-result-card .lobby-return-wrap { margin-top: 20px; }
 .match-result-description { max-width: 390px; margin: 10px auto 0; color: #d0c6b2; line-height: 1.5; }
-.match-page .abandon-match-button { display: block; margin: 14px auto 0; padding: 8px 16px; border: 1px solid #9c5148; border-radius: 8px; background: linear-gradient(135deg, #713b36, #4c2d2a); color: #ffe3dc; font: inherit; font-size: 13px; cursor: pointer; }
+.match-page .abandon-match-button { display: block; width: min(100%, 230px); margin: 14px auto 0; padding: 8px 16px; border: 1px solid #9c5148; border-radius: 8px; background: linear-gradient(135deg, #713b36, #4c2d2a); color: #ffe3dc; font: inherit; font-size: 13px; cursor: pointer; }
 .match-page .abandon-match-button:hover:not(:disabled) { background: linear-gradient(135deg, #8c4840, #603632); }
 .match-page .abandon-match-button:disabled { opacity: 0.55; cursor: not-allowed; }
