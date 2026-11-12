@@ -1,7 +1,7 @@
 using './main.bicep'
 param namePrefix = 'gameproj'
 param environmentName = 'dev'
-param location = 'eastus2'
+param location = 'northcentralus'
 param auth0Authority = 'https://REPLACE.us.auth0.com/'
 param auth0Audience = 'https://REPLACE-api'
 param auth0ClientId = 'REPLACE_PUBLIC_CLIENT_ID'
@@ -13,6 +13,10 @@ param postgresStorageGb = 32
 param logRetentionDays = 30
 param minReplicas = 1
 param maxReplicas = 1
+param monthlyBudgetAmount = 20
+param budgetContactEmail = 'REPLACE_WITH_ALERT_EMAIL'
+param deployBudget = true
+param deployRoleAssignments = true
 param deployData = false
 param deployMigrationJob = false
 param deployApplication = false

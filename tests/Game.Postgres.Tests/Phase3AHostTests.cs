@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Game.Postgres.Tests;
 
@@ -39,16 +41,40 @@ public sealed class Phase3AHostTests(PostgresFixture fixture) : IClassFixture<Po
         finally{Directory.Delete(root,true);}
     }
 
+    [Fact] public async Task SecurityHeadersAndRequestBodyLimitAreApplied()
+    {
+        await using var app=new DeploymentApplication("Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=1");
+        using var client=app.CreateClient();var response=await client.GetAsync("/health/live");response.EnsureSuccessStatusCode();
+        Assert.Equal("nosniff",Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+        Assert.Equal("DENY",Assert.Single(response.Headers.GetValues("X-Frame-Options")));
+        Assert.Equal("no-referrer",Assert.Single(response.Headers.GetValues("Referrer-Policy")));
+        using var oversized=new StringContent(new string('x',65537));
+        var rejected=await client.PostAsync("/api/rooms",oversized);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge,rejected.StatusCode);
+        Assert.Equal("request_too_large",(await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
     [Fact] public void ProductionRefusesMissingRequiredPublicAuthenticationSettings()
     {
         using var app=new DeploymentApplication("Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x",environment:"Production",includeClientId:false);
         var exception=Assert.ThrowsAny<Exception>(()=>app.CreateClient());Assert.Contains("Auth0:ClientId",exception.ToString());
     }
 
+    [Fact] public async Task ProductionEmitsHstsWithoutTrustingForwardedHeadersOrRedirectingInternally()
+    {
+        await using var app=new DeploymentApplication("Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=1",environment:"Production");
+        using var client=app.CreateClient(new(){AllowAutoRedirect=false});
+        using var request=new HttpRequestMessage(HttpMethod.Get,"/health/live");request.Headers.TryAddWithoutValidation("X-Forwarded-Proto","http");
+        var response=await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+        Assert.Equal("max-age=2592000",Assert.Single(response.Headers.GetValues("Strict-Transport-Security")));
+    }
+
     private sealed class DeploymentApplication(string connectionString,string? webRoot=null,string environment="Testing",bool includeClientId=true):WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.ConfigureLogging(logging=>logging.ClearProviders());
             builder.UseEnvironment(environment);if(webRoot is not null)builder.UseWebRoot(webRoot);
             builder.UseSetting("ConnectionStrings:GameDatabase",connectionString);
             builder.UseSetting("Cors:AllowedOrigins:0","https://game.test");

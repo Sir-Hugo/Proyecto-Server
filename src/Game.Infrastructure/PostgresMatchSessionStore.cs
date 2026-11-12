@@ -138,8 +138,8 @@ public sealed class PostgresMatchSessionStore(NpgsqlDataSource source, ILogger<P
     public Task<Guid?> FindLatestMatchAsync(string subject, CancellationToken cancellationToken = default) => GuardAsync<Guid?>("find participant match", async () =>
     {
         await using var command = source.CreateCommand("""
-            SELECT p.match_id FROM match_participants p JOIN matches m ON m.id=p.match_id
-            WHERE p.auth_subject=$1 ORDER BY (m.status='active') DESC, m.created_at DESC LIMIT 1
+            SELECT p.match_id FROM active_match_players p JOIN matches m ON m.id=p.match_id
+            WHERE p.auth_subject=$1 AND m.status='active' ORDER BY m.created_at DESC LIMIT 1
             """);
         command.Parameters.AddWithValue(subject);
         object? value = await command.ExecuteScalarAsync(cancellationToken);

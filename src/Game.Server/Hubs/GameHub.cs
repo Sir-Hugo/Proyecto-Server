@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using Game.Server.Rooms;
 using Game.Server.Contracts.V1;
 using Game.Domain;
+using Game.Server.Administration;
 
 namespace Game.Server.Hubs;
 
@@ -12,11 +13,22 @@ namespace Game.Server.Hubs;
 /// Las conexiones requieren un JWT válido.
 /// </summary>
 [Authorize]
-public sealed class GameHub(MatchRoundService connectionTracker) : Hub
+public sealed class GameHub(MatchRoundService connectionTracker, ConnectionRegistry connectionRegistry) : Hub
 {
+    public override async Task OnConnectedAsync()
+    {
+        if (!connectionRegistry.TryAdd(Context.ConnectionId, GetHumanSubject()))
+        {
+            Context.Abort();
+            throw new HubException("connection_limit_exceeded");
+        }
+        try { await base.OnConnectedAsync(); }
+        catch { connectionRegistry.Remove(Context.ConnectionId); throw; }
+    }
     public override Task OnDisconnectedAsync(Exception? exception)
     {
         connectionTracker.DetachConnection(Context.ConnectionId);
+        connectionRegistry.Remove(Context.ConnectionId);
         return base.OnDisconnectedAsync(exception);
     }
     public async Task JoinRoom(JoinRoomMessage message, InMemoryRoomService rooms)

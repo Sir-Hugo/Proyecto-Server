@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Game.Server.Hubs;
+using Game.Server.Security;
 
 namespace Game.Server.Rooms;
 
@@ -11,7 +12,8 @@ public static class RoomEndpoints
     {
         RouteGroupBuilder rooms = endpoints.MapGroup("/api/rooms")
             .WithTags("Rooms")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting(SecurityRateLimits.ApiPolicy);
 
         rooms.MapPost("", (CreateRoomRequest? request, ClaimsPrincipal user, InMemoryRoomService service) =>
         {

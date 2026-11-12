@@ -246,6 +246,16 @@ public sealed class LiveMatchTests(PostgresFixture fixture) : IClassFixture<Post
         Assert.Single(results, result => result.IsSuccess); Assert.Single(results, result => result.ErrorCode == "player_already_in_match");
         Assert.Equal(1L, await db.ScalarAsync<long>("SELECT count(*) FROM matches")); Assert.Equal(2L, await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players"));
     }
+    [PostgresFact] public async Task RepeatedConcurrentReadyRequestsCreateOneRoomMatchAndReturnItsId()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);var rooms=new InMemoryRoomService(game.NewService(),db.Source);
+        var created=rooms.Create(game.Alice,"public").Value!;Assert.True(rooms.Join(created.Room.RoomId,game.Bob,null).IsSuccess);
+        Assert.True((await rooms.SetReadyAsync(created.Room.RoomId,game.Bob,true)).IsSuccess);
+        var results=await Task.WhenAll(rooms.SetReadyAsync(created.Room.RoomId,game.Alice,true),rooms.SetReadyAsync(created.Room.RoomId,game.Alice,true));
+        Assert.All(results,result=>Assert.True(result.IsSuccess));
+        Assert.Single(results.Select(result=>result.Value!.MatchId).Distinct());Assert.NotNull(results[0].Value!.MatchId);
+        Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM matches"));Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players"));
+    }
     [PostgresFact] public async Task QuickMatchPublishesOnlyAfterDurableCreation()
     {
         await using var db = await fixture.CreateDatabaseAsync(); var game = new LiveMatch(db); var service = game.NewService();

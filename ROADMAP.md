@@ -9,18 +9,19 @@ Esta ruta organiza el trabajo para terminar primero el servidor local, luego des
 - La partida y la cola rápida funcionan con dos jugadores. Los planes simultáneos se validan y resuelven en el servidor; las operaciones se serializan por partida y `requestId` evita aplicar dos veces una jugada, reproduciendo el acuse/resultado ante un reintento idéntico.
 - La elección de nickname temporal sucede antes de la ronda 1. El cliente React muestra la batalla, la salud/energía, las acciones, resultados y estado de conexión.
 - Partidas, salas, membresías, preparación, plazos, eventos, respuestas idempotentes y outbox usan PostgreSQL. Las conexiones se reconstruyen al autenticar y la cola rápida se invalida/reinscribe tras reinicios.
-- La imagen Linux de producción integra ASP.NET Core y el cliente Vite, se ejecuta sin root y expone liveness/readiness. Bicep y los workflows CI/CD de Fase 3A están preparados, pero aún no se ha creado ningún recurso Azure.
+- La imagen Linux de producción integra ASP.NET Core y el cliente Vite, se ejecuta sin root y expone liveness/readiness. El ambiente dev está desplegado y saludable en Azure Container Apps con PostgreSQL privado.
 - Las salas inactivas expiran tras 5 minutos; una partida termina tras 5 minutos sin planes (empate si ninguno envió, victoria para quien sí envió); la cola rápida espera hasta 4 minutos.
 - `docs/asyncapi.yaml` documenta el protocolo AsyncAPI 3.0. Los errores actuales son textos de excepción de SignalR; los mensajes aún no implementados están marcados como planificados. El AsyncAPI está en el archivo, no en la página `/docs`, que corresponde a OpenAPI REST.
 - La recuperación del cliente está implementada, pero su prueba en ejecución sigue pendiente: desactivar Wi-Fi no corta `localhost`, y el modo Offline de DevTools tampoco interrumpió la conexión SignalR existente.
-- CORS y los orígenes de WebSocket están restringidos mediante `Cors:AllowedOrigins`; en desarrollo se permite `http://localhost:5173`. La región de Azure aún no está desplegada. El repositorio Git existe; estas fases no realizan commits ni push automáticamente.
+- CORS y los orígenes de WebSocket están restringidos mediante `Cors:AllowedOrigins`; en desarrollo se permite `http://localhost:5173`. El repositorio Git existe; estas fases no realizan commits ni push automáticamente.
 
 ## Próximo paso
 
 - **Fase 2B implementada:** creación y ciclo de partidas conectados a PostgreSQL, idempotencia y resolución transaccional, asignación activa exclusiva por usuario y eventos reproducibles. Ver `docs/phase2b-validation.md`.
 - **Fase 2C implementada:** recuperación de sesiones/salas, reconexión autorizada, resincronización por secuencia, plazos persistentes y entrega al menos una vez mediante outbox. Ver `docs/phase2c-validation.md`.
 - **Fase 3A implementada:** contenedor de producción, frontend en el mismo origen, health checks, Bicep parametrizado, job separado de migración y workflows CI/CD inicialmente deshabilitados. Ver `docs/phase3a-validation.md`.
-- **Fase 3B pendiente:** cotizar y crear los recursos reales, configurar OIDC/Environments/Auth0/Key Vault, ejecutar la primera migración y medir el despliegue. No iniciarla automáticamente.
+- **Fase 3B.1 completada:** red privada PostgreSQL, permisos de bootstrap, costos, OIDC, Auth0 y procedimiento están revisados en `docs/phase3b-preflight.md`.
+- **Fase 3B.2 desplegada:** Container App, PostgreSQL privado y migraciones 001–003 están saludables. Falta configurar las URLs definitivas de Auth0 y completar la prueba real de dos usuarios.
 
 ## A. Completar y verificar el servidor local
 
@@ -31,8 +32,8 @@ Esta ruta organiza el trabajo para terminar primero el servidor local, luego des
 5. [x] **Asegurar el procesamiento de jugadas en una instancia:** cada partida se procesa bajo su propio bloqueo; se comprueban secuencia, reglas e idempotencia por `requestId`. Un reintento idéntico recupera el acuse y el resultado ya calculado, mientras que reutilizar el identificador con otro plan se rechaza. La coordinación del estado y las respuestas ya son persistentes en 2B; la difusión entre réplicas sigue pendiente.
 6. [x] **Persistir partidas y eventos:** 2B confirma creación, planes, resolución, eventos y resultados privados en PostgreSQL. El estado se consulta por matchId, las rondas se serializan por fila y los requestId sobreviven otra instancia del servicio. Recuperación completa de sesiones queda para 2C.
 7. [~] **Implementar conexión y temporizadores:** el servidor termina partidas tras 5 minutos sin actividad: empate si nadie envía plan y victoria para quien sí lo envió si el rival no responde. La recuperación tras desconexión sigue pendiente de una prueba real: el modo Offline de DevTools no interrumpió la conexión SignalR existente. Falta definir heartbeat/período de gracia.
-8. **Completar historial y administración:** historial paginado y privado por usuario; operaciones administrativas protegidas por rol y registradas en auditoría.
-9. **Endurecer el servidor:** límites por usuario/conexión, tamaño máximo de mensajes, orígenes permitidos, seguridad de logs, encabezados, transporte HTTPS/WSS y aislamiento de fallos entre partidas.
+8. [x] **Completar historial y administración:** historial paginado, detalle y replay privados; administración protegida por el permiso Auth0 `admin:game`; suspensiones y terminaciones con auditoría persistente. La migración 004 y esta versión del servidor aún deben publicarse en Azure.
+9. [~] **Endurecer el servidor:** Fase 4A agrega límites HTTP por usuario/IP, límites de transporte e invocación SignalR, máximo de conexiones por usuario, cuerpos HTTP de 64 KiB, mensajes SignalR de 8 KiB, encabezados defensivos y pruebas JWT. CORS/WSS, logs y aislamiento ya estaban implementados. Faltan límites distribuidos para varias réplicas, CSP validada con Auth0, escaneo explícito de la imagen, alertas y prueba de carga. Ver `docs/phase4a-security-validation.md`.
 10. [~] **Verificar los flujos locales completos:** salas, emparejamiento, rondas sucesivas, victoria/empate y cierre por inactividad se probaron localmente. Faltan reconexión, reintentos y recuperación/persistencia antes del despliegue.
 
 
@@ -48,8 +49,8 @@ Esta ruta organiza el trabajo para terminar primero el servidor local, luego des
 ## C. Desplegar en Azure - Etapa final
 
 1. [x] Preparar la imagen, dimensionamiento inicial, Bicep, Key Vault, identidad administrada, logs y pipelines sin crear recursos.
-2. [ ] Cotizar y desplegar la API detrás de HTTPS/WSS; configurar URLs públicas Auth0, OIDC, orígenes y secretos.
-3. [ ] Conectar Azure PostgreSQL, ejecutar migraciones mediante el job manual y verificar recuperación con la base real.
+2. [~] Cotizar y desplegar la API detrás de HTTPS/WSS; API y secretos están desplegados, pero faltan las URLs públicas definitivas en Auth0 y su validación real.
+3. [x] Conectar Azure PostgreSQL y ejecutar migraciones mediante el job manual. Las migraciones 001–003 están verificadas; la 004 se aplicará con la próxima revisión autorizada.
 4. [ ] Medir monitoreo, costos, despliegue y rollback; configurar presupuesto y alertas.
 5. [ ] Verificar el sistema desplegado con dos clientes reales antes de abrirlo a otros jugadores.
 6. [ ] Diseñar el escalado horizontal en una fase posterior; requiere difusión SignalR, coordinación de cola/workers y pruebas. Redis no forma parte de 3A.

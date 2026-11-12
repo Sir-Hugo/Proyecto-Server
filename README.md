@@ -87,7 +87,7 @@ dotnet run --project tools/Game.Database -- migrate
 dotnet run --project tools/Game.Database -- status
 ```
 
-Una base vacía informa versión 0; el esquema actual instala versiones 1 y 2. La migración 001 de Fase 2A se conserva intacta; 002 añade fecha de inicio, asignaciones activas exclusivas y protección del resultado final. Una base con partidas activas duplicadas por usuario debe corregirse explícitamente antes de migrar: el proceso rechaza el conflicto sin borrar datos. Repetir `migrate` conserva los datos. La tabla `schema_migrations` registra versión, nombre, SHA-256 y fecha. Un checksum incompatible o un error SQL hace fallar el comando con código 1 y rollback; no hay `EnsureCreated`, migración automática al arrancar, ni comando de borrado/downgrade.
+Una base vacía informa versión 0; el esquema actual instala versiones 1 a 4. Las migraciones 001–003 se conservan intactas. La 004 agrega suspensiones de usuarios y auditoría administrativa append-only. Una base con partidas activas duplicadas por usuario debe corregirse explícitamente antes de migrar: el proceso rechaza el conflicto sin borrar datos. Repetir `migrate` conserva los datos. La tabla `schema_migrations` registra versión, nombre, SHA-256 y fecha. Un checksum incompatible o un error SQL hace fallar el comando con código 1 y rollback; no hay `EnsureCreated`, migración automática al arrancar, ni comando de borrado/downgrade.
 
 5. Compila y ejecuta pruebas:
 
@@ -96,7 +96,7 @@ dotnet build ProyectoServer.slnx --configuration Release
 dotnet test ProyectoServer.slnx
 ```
 
-Sin habilitación explícita, las 52 pruebas originales se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **71 pruebas PostgreSQL actuales** (35 de 2A y 36 añadidas en 2B):
+Sin habilitación explícita, las 52 pruebas de dominio y servidor se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **93 pruebas PostgreSQL actuales**:
 
 ```powershell
 $env:GAME_POSTGRES_TESTS = '1'
@@ -148,6 +148,26 @@ Cada resolución o cierre inserta sus notificaciones en la misma transacción qu
 
 Configuración: `MatchLifecycle:RoundTimeoutMinutes`, `MatchLifecycle:DisconnectGraceSeconds`, `SignalR:KeepAliveSeconds` y `SignalR:ClientTimeoutSeconds`. El informe y los comandos exactos están en [docs/phase2c-validation.md](docs/phase2c-validation.md).
 
+## Historial y administración
+
+`GET /api/history` devuelve el historial paginado del `sub` autenticado. El detalle y la reproducción de eventos responden 404 si ese usuario no participó en la partida. La reproducción proyecta cada evento a la perspectiva del solicitante y excluye payloads internos, planes, tiradas críticas y subjects de autenticación.
+
+Los endpoints bajo `/api/admin` consultan partidas activas y conexiones de la instancia, terminan partidas, suspenden o rehabilitan usuarios y consultan auditoría. Exigen el permiso exacto `admin:game` en la claim `permissions`; un nombre de rol por sí solo no concede acceso. En Auth0 se debe crear ese permiso para la API, asignarlo mediante RBAC y habilitar **Add Permissions in the Access Token**. Las terminaciones y suspensiones se registran en `admin_audit_log`, protegido contra UPDATE, DELETE y TRUNCATE. Una suspensión se comprueba tanto en HTTP como en invocaciones SignalR.
+
+La implementación y su validación se describen en [docs/history-administration-validation.md](docs/history-administration-validation.md). Aplicarla en Azure requiere ejecutar primero la migración 004 mediante el Migration Job y luego desplegar una imagen nueva; estas operaciones no se realizan automáticamente.
+
+## Controles de seguridad
+
+Las rutas REST autenticadas aplican límites por `sub` y las solicitudes anónimas por la IP del par directo, sin confiar en headers reenviados. El proxy compartido solo agrupa intentos anónimos contra rutas protegidas: las rutas públicas de SPA, configuración y health checks no tienen esta política, y un JWT válido crea su partición por usuario antes de autorizar. El servidor devuelve HTTP 429 con `Retry-After` al exceder 120 solicitudes por minuto por usuario o 30 anónimas. SignalR limita el transporte, cada conexión, el total por usuario aunque se reconecte y cinco conexiones simultáneas por usuario. Estos contadores son locales a la instancia; el despliegue mantiene una sola réplica y necesita coordinación distribuida antes de escalar.
+
+Kestrel limita los cuerpos HTTP a 64 KiB y SignalR los mensajes a 8 KiB. Container Apps impone HTTPS/WSS mediante `allowInsecure=false`; el servidor no confía en forwarded headers ni redirige el HTTP interno posterior a la terminación TLS. Producción emite HSTS y todas las respuestas incluyen encabezados contra MIME sniffing, framing y filtración de referrer. Los valores se configuran bajo `Http` y `RateLimiting` en `appsettings.json`. La matriz completa, pruebas y limitaciones están en [docs/phase4a-security-validation.md](docs/phase4a-security-validation.md).
+
+## Partidas consecutivas
+
+El cliente conserva en `localStorage` únicamente el identificador de una partida activa. Al completar una partida mantiene el resultado en pantalla, libera esa referencia activa y, al volver al lobby, descarta las referencias de navegación de la sala anterior. Los mensajes SignalR se validan por `matchId` y secuencia dentro de cada partida, de modo que una respuesta tardía de una partida terminada no puede reemplazar una partida nueva.
+
+La recuperación sin un ID explícito consulta exclusivamente `active_match_players`. Una partida finalizada permanece disponible en historial, pero no se selecciona automáticamente como sesión activa. La causa, regresiones y procedimiento de actualización están en [docs/consecutive-matches-validation.md](docs/consecutive-matches-validation.md).
+
 ## Contenedor e infraestructura — Fase 3A
 
 El `Dockerfile` multi-stage compila el cliente Vite, publica el servidor y la herramienta de migraciones, y genera una imagen Linux basada en ASP.NET Core 10 chiseled. La imagen expone el puerto 8080 y se ejecuta como usuario no-root. ASP.NET Core sirve la SPA desde el mismo origen que REST y SignalR; `/config/client.json` entrega únicamente el dominio, client ID y audience públicos de Auth0. En desarrollo, las variables `VITE_AUTH0_*` siguen disponibles para el servidor Vite.
@@ -178,3 +198,7 @@ Los endpoints operativos son:
 `infra/main.bicep` declara Container Apps, su environment, ACR Basic, PostgreSQL Flexible Server 17, Key Vault, identidad administrada, Log Analytics y Application Insights. Los parámetros de dev y prod son ejemplos sin secretos y dejan la creación de datos, job y aplicación deshabilitada. La configuración inicial mantiene exactamente una réplica. El job manual ejecuta `Game.Database migrate` antes de desplegar una nueva revisión; el servidor nunca migra al arrancar.
 
 CI está en `.github/workflows/ci.yml`. CD está en `.github/workflows/cd.yml` y no realiza ninguna operación Azure mientras `AZURE_DEPLOY_ENABLED` no sea `true`; usa OIDC y ambientes GitHub separados. La preparación, los límites y los pasos exactos para 3B están en [el informe de Fase 3A](docs/phase3a-validation.md), y el cálculo de gasto está en [costos Azure](docs/azure-costs.md).
+
+El preflight local de Fase 3B.1, las correcciones de red privada y la secuencia de bootstrap están en [docs/phase3b-preflight.md](docs/phase3b-preflight.md). En esa subfase la validación quedó bloqueada hasta instalar Azure CLI; la cuenta ya se comprobó durante 3B.2.
+
+La Fase 3B.2 dejó el servidor saludable en Azure Container Apps con PostgreSQL privado y las migraciones 001–003 aplicadas. La validación final con dos usuarios reales sigue esperando las URLs definitivas de Auth0. El estado, costos y comandos están en [docs/phase3b-deployment.md](docs/phase3b-deployment.md).

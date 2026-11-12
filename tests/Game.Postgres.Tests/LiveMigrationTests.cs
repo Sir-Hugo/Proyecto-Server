@@ -13,7 +13,7 @@ public sealed class LiveMigrationTests(PostgresFixture fixture) : IClassFixture<
         await using var db = await fixture.CreateDatabaseAsync(false); string checksum = await InstallVersionOneAsync(db);
         var match = Sample(); await db.Store.CreateAsync(match);
         await db.Migrator.ApplyAsync(); await db.Migrator.ApplyAsync();
-        var versions = await db.Migrator.GetVersionsAsync(); Assert.Equal(new[] { 1, 2, 3 }, versions.Select(v => v.Version));
+        var versions = await db.Migrator.GetVersionsAsync(); Assert.Equal(new[] { 1, 2, 3, 4 }, versions.Select(v => v.Version));
         Assert.Equal(checksum, versions[0].Checksum);
         Assert.Equal(match.State, (await db.Store.GetAsync(match.State.MatchId))!.State);
         Assert.Equal(2L, await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players"));
@@ -33,8 +33,9 @@ public sealed class LiveMigrationTests(PostgresFixture fixture) : IClassFixture<
         var assembly=typeof(SchemaMigrator).Assembly;using var reader=new StreamReader(assembly.GetManifestResourceStream("Game.Infrastructure.Migrations.002_live_matches.sql")!,Encoding.UTF8);
         string sql=(await reader.ReadToEndAsync()).ReplaceLineEndings("\n");string checksum=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sql)));
         await db.ExecuteAsync(sql);await db.ExecuteAsync("INSERT INTO schema_migrations(version,name,checksum) VALUES(2,'002_live_matches.sql',$1)",checksum);
-        await db.Migrator.ApplyAsync();Assert.Equal(new[]{1,2,3},(await db.Migrator.GetVersionsAsync()).Select(v=>v.Version));
+        await db.Migrator.ApplyAsync();Assert.Equal(new[]{1,2,3,4},(await db.Migrator.GetVersionsAsync()).Select(v=>v.Version));
         Assert.Equal(match.State,(await db.Store.GetAsync(match.State.MatchId))!.State);Assert.True(await db.ScalarAsync<bool>("SELECT to_regclass('rooms') IS NOT NULL AND to_regclass('match_outbox') IS NOT NULL"));
+        Assert.True(await db.ScalarAsync<bool>("SELECT to_regclass('user_suspensions') IS NOT NULL AND to_regclass('admin_audit_log') IS NOT NULL"));
     }
     private static StoredMatch Sample()
     {
