@@ -87,7 +87,7 @@ dotnet run --project tools/Game.Database -- migrate
 dotnet run --project tools/Game.Database -- status
 ```
 
-Una base vacía informa versión 0; el esquema actual instala versiones 1 y 2. La migración 001 de Fase 2A se conserva intacta; 002 añade fecha de inicio, asignaciones activas exclusivas y protección del resultado final. Una base con partidas activas duplicadas por usuario debe corregirse explícitamente antes de migrar: el proceso rechaza el conflicto sin borrar datos. Repetir `migrate` conserva los datos. La tabla `schema_migrations` registra versión, nombre, SHA-256 y fecha. Un checksum incompatible o un error SQL hace fallar el comando con código 1 y rollback; no hay `EnsureCreated`, migración automática al arrancar, ni comando de borrado/downgrade.
+Una base vacía informa versión 0; el esquema actual instala versiones 1 a 4. Las migraciones 001–003 se conservan intactas. La 004 agrega suspensiones de usuarios y auditoría administrativa append-only. Una base con partidas activas duplicadas por usuario debe corregirse explícitamente antes de migrar: el proceso rechaza el conflicto sin borrar datos. Repetir `migrate` conserva los datos. La tabla `schema_migrations` registra versión, nombre, SHA-256 y fecha. Un checksum incompatible o un error SQL hace fallar el comando con código 1 y rollback; no hay `EnsureCreated`, migración automática al arrancar, ni comando de borrado/downgrade.
 
 5. Compila y ejecuta pruebas:
 
@@ -96,7 +96,7 @@ dotnet build ProyectoServer.slnx --configuration Release
 dotnet test ProyectoServer.slnx
 ```
 
-Sin habilitación explícita, las 52 pruebas originales se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **71 pruebas PostgreSQL actuales** (35 de 2A y 36 añadidas en 2B):
+Sin habilitación explícita, las 52 pruebas de dominio y servidor se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **90 pruebas PostgreSQL actuales**:
 
 ```powershell
 $env:GAME_POSTGRES_TESTS = '1'
@@ -148,6 +148,14 @@ Cada resolución o cierre inserta sus notificaciones en la misma transacción qu
 
 Configuración: `MatchLifecycle:RoundTimeoutMinutes`, `MatchLifecycle:DisconnectGraceSeconds`, `SignalR:KeepAliveSeconds` y `SignalR:ClientTimeoutSeconds`. El informe y los comandos exactos están en [docs/phase2c-validation.md](docs/phase2c-validation.md).
 
+## Historial y administración
+
+`GET /api/history` devuelve el historial paginado del `sub` autenticado. El detalle y la reproducción de eventos responden 404 si ese usuario no participó en la partida. La reproducción proyecta cada evento a la perspectiva del solicitante y excluye payloads internos, planes, tiradas críticas y subjects de autenticación.
+
+Los endpoints bajo `/api/admin` consultan partidas activas y conexiones de la instancia, terminan partidas, suspenden o rehabilitan usuarios y consultan auditoría. Exigen el permiso exacto `admin:game` en la claim `permissions`; un nombre de rol por sí solo no concede acceso. En Auth0 se debe crear ese permiso para la API, asignarlo mediante RBAC y habilitar **Add Permissions in the Access Token**. Las terminaciones y suspensiones se registran en `admin_audit_log`, protegido contra UPDATE, DELETE y TRUNCATE. Una suspensión se comprueba tanto en HTTP como en invocaciones SignalR.
+
+La implementación y su validación se describen en [docs/history-administration-validation.md](docs/history-administration-validation.md). Aplicarla en Azure requiere ejecutar primero la migración 004 mediante el Migration Job y luego desplegar una imagen nueva; estas operaciones no se realizan automáticamente.
+
 ## Contenedor e infraestructura — Fase 3A
 
 El `Dockerfile` multi-stage compila el cliente Vite, publica el servidor y la herramienta de migraciones, y genera una imagen Linux basada en ASP.NET Core 10 chiseled. La imagen expone el puerto 8080 y se ejecuta como usuario no-root. ASP.NET Core sirve la SPA desde el mismo origen que REST y SignalR; `/config/client.json` entrega únicamente el dominio, client ID y audience públicos de Auth0. En desarrollo, las variables `VITE_AUTH0_*` siguen disponibles para el servidor Vite.
@@ -181,4 +189,4 @@ CI está en `.github/workflows/ci.yml`. CD está en `.github/workflows/cd.yml` y
 
 El preflight local de Fase 3B.1, las correcciones de red privada y la secuencia de bootstrap están en [docs/phase3b-preflight.md](docs/phase3b-preflight.md). En esa subfase la validación quedó bloqueada hasta instalar Azure CLI; la cuenta ya se comprobó durante 3B.2.
 
-La revisión de Fase 3B.2 creó únicamente el grupo vacío `rg-gameproj-dev`. Azure for Students rechazó `eastus2` y `centralus`; la validación ARM y el what-if en `northcentralus` aprobaron 19 creaciones dev, sin cambios destructivos. El plan, costos y comandos están en [docs/phase3b-deployment.md](docs/phase3b-deployment.md); el despliegue facturable requiere aprobación final.
+La Fase 3B.2 dejó el servidor saludable en Azure Container Apps con PostgreSQL privado y las migraciones 001–003 aplicadas. La validación final con dos usuarios reales sigue esperando las URLs definitivas de Auth0. El estado, costos y comandos están en [docs/phase3b-deployment.md](docs/phase3b-deployment.md).

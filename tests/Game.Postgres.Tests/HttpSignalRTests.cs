@@ -143,6 +143,56 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM match_events WHERE match_id=$1 AND event_type='round.resolved'",matchId));Assert.Equal(1,(await db.Store.GetAsync(matchId))!.State.SequenceNumber);
     }
 
+    [PostgresFact] public async Task HistoryIsPagedParticipantOnlyAndReplayOmitsPrivateEventData()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);var service=await game.CreateAsync();
+        await service.AbandonAsync(game.Initial.MatchId,game.Bob);
+        await using var app=new GameApplication(db.ConnectionString);using var alice=app.Player(game.Alice);using var outsider=app.Player("auth0|history-outsider");using var anonymous=app.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/history")).StatusCode);
+        var page=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=1&pageSize=1");
+        Assert.Equal(1,page.GetProperty("total").GetInt32());Assert.Single(page.GetProperty("items").EnumerateArray());
+        var detail=await alice.GetAsync($"/api/history/{game.Initial.MatchId}");detail.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.NotFound,(await outsider.GetAsync($"/api/history/{game.Initial.MatchId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await outsider.GetAsync($"/api/history/{game.Initial.MatchId}/events")).StatusCode);
+        var replay=await alice.GetAsync($"/api/history/{game.Initial.MatchId}/events");replay.EnsureSuccessStatusCode();string json=await replay.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("firstPlan",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("secondPlan",json,StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("criticalRolls",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("auth0|",json,StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(JsonDocument.Parse(json).RootElement.GetProperty("events").EnumerateArray());
+    }
+
+    [PostgresFact] public async Task AdministrationRequiresAuth0PermissionTerminatesAtomicallyAndIsDocumented()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);await game.CreateAsync();await using var app=new GameApplication(db.ConnectionString);
+        using var anonymous=app.CreateClient();using var player=app.Player(game.Alice);using var fakeRole=app.Player("auth0|fake-admin",role:"admin");using var admin=app.Player("auth0|administrator",admin:true);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/admin/matches/active")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await player.GetAsync("/api/admin/matches/active")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,(await fakeRole.GetAsync("/api/admin/matches/active")).StatusCode);
+        var active=await admin.GetAsync("/api/admin/matches/active");active.EnsureSuccessStatusCode();Assert.Contains(game.Initial.MatchId.ToString(),await active.Content.ReadAsStringAsync());
+        var terminated=await admin.PostAsJsonAsync($"/api/admin/matches/{game.Initial.MatchId}/terminate",new{reason="Entrega universitaria"});terminated.EnsureSuccessStatusCode();
+        Assert.Equal("completed",await db.ScalarAsync<string>("SELECT status::text FROM matches WHERE id=$1",game.Initial.MatchId));
+        Assert.Equal("administrative",await db.ScalarAsync<string>("SELECT terminal_reason FROM matches WHERE id=$1",game.Initial.MatchId));
+        Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM admin_audit_log WHERE action='match.terminated' AND match_id=$1",game.Initial.MatchId));
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM match_outbox WHERE match_id=$1",game.Initial.MatchId));
+        (await admin.GetAsync("/api/admin/audit?page=1&pageSize=10")).EnsureSuccessStatusCode();
+        var openApi=await anonymous.GetStringAsync("/openapi/v1.json");Assert.Contains("/api/history",openApi);Assert.Contains("/api/admin/audit",openApi);Assert.Contains("bearer",openApi,StringComparison.OrdinalIgnoreCase);
+    }
+
+    [PostgresFact] public async Task SuspensionBlocksHttpAndExistingHubAndAdministrativeActionsAreAppendOnly()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString);const string subject="auth0|suspended-player";
+        using var admin=app.Player("auth0|administrator",admin:true);using var player=app.Player(subject);await using var hub=app.Hub(subject);await hub.StartAsync();
+        var connections=await admin.GetStringAsync("/api/admin/connections");Assert.Contains(subject,connections);
+        string route=$"/api/admin/users/{Uri.EscapeDataString(subject)}/suspension";
+        var suspended=await admin.PutAsJsonAsync(route,new{reason="Incumplimiento comprobado",expiresAt=(DateTimeOffset?)null});suspended.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden,(await player.GetAsync("/api/history")).StatusCode);
+        var blocked=await Record.ExceptionAsync(()=>hub.InvokeAsync("ResumeMatch",new{type="match.resume",version=1,matchId=(Guid?)null,lastSequence=(long?)null}));
+        Assert.NotNull(blocked);Assert.True(blocked is Microsoft.AspNetCore.SignalR.HubException{Message:"user_suspended"} or HttpRequestException{StatusCode:HttpStatusCode.Forbidden});
+        Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM admin_audit_log WHERE action='user.suspended' AND target_subject=$1",subject));
+        await Assert.ThrowsAsync<Npgsql.PostgresException>(()=>db.ExecuteAsync("UPDATE admin_audit_log SET reason='changed'"));
+        using var request=new HttpRequestMessage(HttpMethod.Delete,route){Content=JsonContent.Create(new{reason="Revisión completada"})};var restored=await admin.SendAsync(request);restored.EnsureSuccessStatusCode();
+        (await player.GetAsync("/api/history")).EnsureSuccessStatusCode();Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM admin_audit_log WHERE target_subject=$1",subject));
+    }
+
     private static async Task<JsonElement> NextAsync(Channel<JsonElement> channel) =>
         await channel.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
     private static async Task<JsonElement> ActiveAsync(Channel<JsonElement> channel)
@@ -183,12 +233,16 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
                 };
             }));
         }
-        private string Token(string subject) => new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
-            issuer: "https://identity.test/", audience: "phase2b-tests", claims: [new Claim("sub", subject)],
+        private string Token(string subject,bool admin=false,string? role=null) => new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+            issuer: "https://identity.test/", audience: "phase2b-tests", claims: Claims(subject,admin,role),
             expires: DateTime.UtcNow.AddMinutes(10), signingCredentials: new(key, SecurityAlgorithms.HmacSha256)));
-        public HttpClient Player(string subject)
+        private static IEnumerable<Claim> Claims(string subject,bool admin,string? role)
         {
-            var client = CreateClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject)); return client;
+            yield return new Claim("sub",subject);if(admin)yield return new Claim("permissions","admin:game");if(role is not null)yield return new Claim("role",role);
+        }
+        public HttpClient Player(string subject,bool admin=false,string? role=null)
+        {
+            var client = CreateClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(subject,admin,role)); return client;
         }
         public HubConnection Hub(string subject)
         {

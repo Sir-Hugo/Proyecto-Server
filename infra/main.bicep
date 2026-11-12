@@ -178,15 +178,14 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: vaultName
   location: location
   tags: tags
-  properties: {
+  properties: union({
     tenantId: tenant().tenantId
     sku: { family: 'A', name: 'standard' }
     enableRbacAuthorization: true
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
-    enablePurgeProtection: environmentName == 'prod'
     publicNetworkAccess: 'Enabled'
-  }
+  }, environmentName == 'prod' ? { enablePurgeProtection: true } : {})
 }
 
 resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployRoleAssignments) {

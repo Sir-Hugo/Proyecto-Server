@@ -1,12 +1,15 @@
 using Game.Domain;
 using Game.Infrastructure;
 using Game.Server.Auth;
+using Game.Server.Administration;
 using Game.Server.Health;
+using Game.Server.History;
 using Game.Server.Hubs;
 using Game.Server.Rooms;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Headers;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.SignalR;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +29,9 @@ if (allowedOrigins.Length == 0)
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks().AddCheck<PostgresReadinessHealthCheck>("postgresql", tags: ["ready"]);
 builder.Services.AddGameAuthentication(builder.Configuration);
+builder.Services.AddAuthorization(options => options.AddPolicy(AdministrationEndpoints.Policy, policy =>
+    policy.RequireAuthenticatedUser().RequireClaim("permissions", "admin:game")));
+builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<ICriticalHitSource, SecureCriticalHitSource>();
 builder.Services.AddSingleton<RoundResolver>();
 builder.Services.AddSingleton<MatchRoundService>();
@@ -42,6 +48,7 @@ builder.Services.AddSignalR(options =>
     options.MaximumReceiveMessageSize = 8 * 1024;
     options.KeepAliveInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("SignalR:KeepAliveSeconds", 15));
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(builder.Configuration.GetValue("SignalR:ClientTimeoutSeconds", 45));
+    options.AddFilter<SuspendedUserHubFilter>();
 });
 builder.Services.AddOpenApi(options =>
 {
@@ -66,6 +73,7 @@ foreach (string origin in allowedOrigins) webSocketOptions.AllowedOrigins.Add(or
 app.UseWebSockets(webSocketOptions);
 app.UseCors(webClientCorsPolicy);
 app.UseAuthentication();
+app.UseMiddleware<SuspendedUserMiddleware>();
 app.UseAuthorization();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -82,6 +90,8 @@ app.MapGet("/config/client.json", (IConfiguration configuration) => Results.Ok(n
     auth0Audience = configuration["Authentication:Audience"]
 })).AllowAnonymous().ExcludeFromDescription();
 app.MapRoomEndpoints();
+app.MapHistoryEndpoints();
+app.MapAdministrationEndpoints();
 app.MapHub<GameHub>("/hubs/game").RequireAuthorization();
 app.MapFallback(async context =>
 {

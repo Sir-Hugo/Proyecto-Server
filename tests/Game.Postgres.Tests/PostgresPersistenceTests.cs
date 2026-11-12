@@ -22,20 +22,20 @@ public sealed class PostgresPersistenceTests(PostgresFixture fixture) : IClassFi
     private static StoredPendingPlan Plan(StoredMatch match) => new(match.State.MatchId, match.State.FirstPlayer.PlayerId,
         Guid.NewGuid(), 1, 0, [GameAction.Attack], JsonSerializer.SerializeToElement(new { type = "round.plan.accepted", sequence = 0 }));
 
-    [PostgresFact] public async Task CreatesAllFiveTablesFromEmptyDatabase()
+    [PostgresFact] public async Task CreatesCurrentSchemaFromEmptyDatabase()
     {
         await using var db = await fixture.CreateDatabaseAsync(false);
         Assert.Empty(await db.Migrator.GetVersionsAsync());
         await db.Migrator.ApplyAsync();
-        Assert.Equal(3, (await db.Migrator.GetVersionsAsync()).Max(version => version.Version));
-        Assert.Equal(5L, await db.ScalarAsync<long>("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('matches','match_participants','match_events','pending_round_plans','match_commands')"));
+        Assert.Equal(4, (await db.Migrator.GetVersionsAsync()).Max(version => version.Version));
+        Assert.Equal(7L, await db.ScalarAsync<long>("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('matches','match_participants','match_events','pending_round_plans','match_commands','user_suspensions','admin_audit_log')"));
     }
     [PostgresFact] public async Task RepeatedAndConcurrentMigrationsPreserveData()
     {
         await using var db = await fixture.CreateDatabaseAsync(); var match = Match();
         await db.Store.CreateAsync(match); await db.Store.AppendEventAsync(Event(match));
         await Task.WhenAll(db.Migrator.ApplyAsync(), db.Migrator.ApplyAsync());
-        Assert.Equal(3, (await db.Migrator.GetVersionsAsync()).Count);
+        Assert.Equal(4, (await db.Migrator.GetVersionsAsync()).Count);
         Assert.Equal(match.State, (await db.Store.GetAsync(match.State.MatchId))!.State);
         Assert.Equal(1L, await db.ScalarAsync<long>("SELECT count(*) FROM match_events"));
     }

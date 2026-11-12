@@ -14,6 +14,7 @@ public static class PostgresServices
         services.AddSingleton(_ => CreateDataSource(connectionString));
         services.AddSingleton<SchemaMigrator>();
         services.AddSingleton<PostgresMatchStore>();
+        services.AddSingleton<PostgresGameManagementStore>();
         services.AddSingleton<IMatchSessionStore, PostgresMatchSessionStore>();
         return services;
     }
