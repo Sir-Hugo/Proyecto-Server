@@ -33,7 +33,8 @@ public static class AdministrationEndpoints
             return await store.UnsuspendAsync(Subject(user),subject,request!.Reason!.Trim(),ct)?Results.Ok(new{subject,suspended=false}):Results.NotFound();
         }).WithName("AdminUnsuspendUser").WithSummary("Retira una suspensión y registra la acción.");
         admin.MapGet("/audit",async(int? page,int? pageSize,PostgresGameManagementStore store,CancellationToken ct)=>Results.Ok(await store.GetAuditAsync(page??1,pageSize??50,ct)))
-            .WithName("AdminAuditLog").WithSummary("Consulta paginada de auditoría administrativa append-only.");
+            .WithName("AdminAuditLog").WithSummary("Consulta paginada de auditoría administrativa append-only.")
+            .Produces<PageResult<AdminAuditView>>().Produces(StatusCodes.Status401Unauthorized).Produces(StatusCodes.Status403Forbidden);
         return endpoints;
     }
     private static bool ValidReason(string? reason)=>!string.IsNullOrWhiteSpace(reason)&&reason.Trim().Length<=500;

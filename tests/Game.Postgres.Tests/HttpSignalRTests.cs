@@ -146,18 +146,30 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
     [PostgresFact] public async Task HistoryIsPagedParticipantOnlyAndReplayOmitsPrivateEventData()
     {
         await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);var service=await game.CreateAsync();
+        await service.SubmitAsync(game.Alice,"alice-plan",game.Command(actions:["Attack"]));
+        await service.SubmitAsync(game.Bob,"bob-plan",game.Command(actions:["Block"]));
         await service.AbandonAsync(game.Initial.MatchId,game.Bob);
-        await using var app=new GameApplication(db.ConnectionString);using var alice=app.Player(game.Alice);using var outsider=app.Player("auth0|history-outsider");using var anonymous=app.CreateClient();
+        var second=new LiveMatch(db);var secondService=await second.CreateAsync();await secondService.AbandonAsync(second.Initial.MatchId,second.Bob);
+        var foreign=new LiveMatch(db,"-foreign");var foreignService=await foreign.CreateAsync();await foreignService.AbandonAsync(foreign.Initial.MatchId,foreign.Bob);
+        await using var app=new GameApplication(db.ConnectionString);using var alice=app.Player(game.Alice);using var outsider=app.Player("auth0|history-outsider");using var foreignPlayer=app.Player(foreign.Alice);using var anonymous=app.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/history")).StatusCode);
-        var page=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=1&pageSize=1");
-        Assert.Equal(1,page.GetProperty("total").GetInt32());Assert.Single(page.GetProperty("items").EnumerateArray());
-        var detail=await alice.GetAsync($"/api/history/{game.Initial.MatchId}");detail.EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync($"/api/history/{game.Initial.MatchId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync($"/api/history/{game.Initial.MatchId}/events")).StatusCode);
+        var firstPage=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=1&pageSize=1");var secondPage=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=2&pageSize=1");var emptyPage=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=3&pageSize=1");
+        Assert.Equal(2,firstPage.GetProperty("total").GetInt32());Assert.Equal(1,firstPage.GetProperty("pageSize").GetInt32());Assert.Single(firstPage.GetProperty("items").EnumerateArray());
+        Assert.Equal(2,secondPage.GetProperty("page").GetInt32());Assert.Single(secondPage.GetProperty("items").EnumerateArray());Assert.Empty(emptyPage.GetProperty("items").EnumerateArray());
+        var ownIds=new[]{firstPage,secondPage}.Select(page=>page.GetProperty("items")[0].GetProperty("matchId").GetGuid()).ToHashSet();Assert.True(ownIds.SetEquals([game.Initial.MatchId,second.Initial.MatchId]));
+        Assert.Equal(0,(await outsider.GetFromJsonAsync<JsonElement>("/api/history")).GetProperty("total").GetInt32());Assert.Equal(1,(await foreignPlayer.GetFromJsonAsync<JsonElement>("/api/history")).GetProperty("total").GetInt32());
+        var detail=await alice.GetAsync($"/api/history/{game.Initial.MatchId}");detail.EnsureSuccessStatusCode();string detailJson=await detail.Content.ReadAsStringAsync();Assert.DoesNotContain("auth0|",detailJson,StringComparison.OrdinalIgnoreCase);
         Assert.Equal(HttpStatusCode.NotFound,(await outsider.GetAsync($"/api/history/{game.Initial.MatchId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,(await outsider.GetAsync($"/api/history/{game.Initial.MatchId}/events")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await alice.GetAsync($"/api/history/{Guid.NewGuid()}")).StatusCode);
         var replay=await alice.GetAsync($"/api/history/{game.Initial.MatchId}/events");replay.EnsureSuccessStatusCode();string json=await replay.Content.ReadAsStringAsync();
         Assert.DoesNotContain("firstPlan",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("secondPlan",json,StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("criticalRolls",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("auth0|",json,StringComparison.OrdinalIgnoreCase);
-        Assert.NotEmpty(JsonDocument.Parse(json).RootElement.GetProperty("events").EnumerateArray());
+        Assert.DoesNotContain("criticalRolls",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("auth0|",json,StringComparison.OrdinalIgnoreCase);Assert.DoesNotContain("requestId",json,StringComparison.OrdinalIgnoreCase);
+        var replayEvents=JsonDocument.Parse(json).RootElement.GetProperty("events").EnumerateArray().ToArray();Assert.Contains(replayEvents,item=>item.GetProperty("type").GetString()=="round.resolved");
+        var sequences=replayEvents.Select(item=>item.GetProperty("sequence").GetInt64()).ToArray();Assert.Equal(sequences.Order().ToArray(),sequences);Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM match_events WHERE match_id=$1 AND event_type='round.resolved'",game.Initial.MatchId));
+        var round=replayEvents.Single(item=>item.GetProperty("type").GetString()=="round.resolved");Assert.True(round.TryGetProperty("you",out var you));Assert.True(you.TryGetProperty("energy",out _));Assert.True(round.TryGetProperty("opponent",out var opponent));Assert.False(opponent.TryGetProperty("energy",out _));
     }
 
     [PostgresFact] public async Task AdministrationRequiresAuth0PermissionTerminatesAtomicallyAndIsDocumented()
@@ -173,8 +185,12 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("administrative",await db.ScalarAsync<string>("SELECT terminal_reason FROM matches WHERE id=$1",game.Initial.MatchId));
         Assert.Equal(1L,await db.ScalarAsync<long>("SELECT count(*) FROM admin_audit_log WHERE action='match.terminated' AND match_id=$1",game.Initial.MatchId));
         Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM match_outbox WHERE match_id=$1",game.Initial.MatchId));
-        (await admin.GetAsync("/api/admin/audit?page=1&pageSize=10")).EnsureSuccessStatusCode();
-        var openApi=await anonymous.GetStringAsync("/openapi/v1.json");Assert.Contains("/api/history",openApi);Assert.Contains("/api/admin/audit",openApi);Assert.Contains("bearer",openApi,StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.Unauthorized,(await anonymous.GetAsync("/api/admin/audit")).StatusCode);Assert.Equal(HttpStatusCode.Forbidden,(await player.GetAsync("/api/admin/audit")).StatusCode);Assert.Equal(HttpStatusCode.Forbidden,(await fakeRole.GetAsync("/api/admin/audit")).StatusCode);
+        var auditResponse=await admin.GetAsync("/api/admin/audit?page=1&pageSize=10");auditResponse.EnsureSuccessStatusCode();var audit=(await auditResponse.Content.ReadFromJsonAsync<JsonElement>());Assert.Equal(1,audit.GetProperty("total").GetInt32());var auditItem=Assert.Single(audit.GetProperty("items").EnumerateArray());Assert.Equal("match.terminated",auditItem.GetProperty("action").GetString());Assert.Equal(game.Initial.MatchId,auditItem.GetProperty("matchId").GetGuid());
+        var openApi=JsonDocument.Parse(await anonymous.GetStringAsync("/openapi/v1.json")).RootElement;var paths=openApi.GetProperty("paths");Assert.True(paths.TryGetProperty("/api/history",out var historyPath));Assert.True(paths.TryGetProperty("/api/history/{matchId}",out var detailPath));Assert.True(paths.TryGetProperty("/api/history/{matchId}/events",out var replayPath));Assert.True(paths.TryGetProperty("/api/admin/audit",out var auditPath));
+        Assert.Equal("Bearer",historyPath.GetProperty("get").GetProperty("security")[0].EnumerateObject().Single().Name);Assert.Equal("Bearer",auditPath.GetProperty("get").GetProperty("security")[0].EnumerateObject().Single().Name);
+        Assert.True(historyPath.GetProperty("get").GetProperty("responses").TryGetProperty("401",out _));Assert.True(detailPath.GetProperty("get").GetProperty("responses").TryGetProperty("404",out _));Assert.True(replayPath.GetProperty("get").GetProperty("responses").TryGetProperty("404",out _));Assert.True(auditPath.GetProperty("get").GetProperty("responses").TryGetProperty("403",out _));
+        Assert.True(historyPath.GetProperty("get").GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json").TryGetProperty("schema",out _));Assert.True(auditPath.GetProperty("get").GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty("application/json").TryGetProperty("schema",out _));
     }
 
     [PostgresFact] public async Task SuspensionBlocksHttpAndExistingHubAndAdministrativeActionsAreAppendOnly()

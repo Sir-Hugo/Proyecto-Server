@@ -5,6 +5,8 @@ using Game.Infrastructure;
 
 namespace Game.Server.History;
 
+public sealed record MatchReplayView(Guid MatchId,IReadOnlyList<object> Events);
+
 public static class HistoryEndpoints
 {
     public static IEndpointRouteBuilder MapHistoryEndpoints(this IEndpointRouteBuilder endpoints)
@@ -12,18 +14,21 @@ public static class HistoryEndpoints
         var history=endpoints.MapGroup("/api/history").WithTags("History").RequireAuthorization();
         history.MapGet("",async(int? page,int? pageSize,ClaimsPrincipal user,PostgresGameManagementStore store,CancellationToken ct)=>
             Results.Ok(await store.GetHistoryAsync(Subject(user),page??1,pageSize??20,ct)))
-            .WithName("GetMatchHistory").WithSummary("Lista de forma paginada las partidas del usuario autenticado.");
+            .WithName("GetMatchHistory").WithSummary("Lista de forma paginada las partidas del usuario autenticado.")
+            .Produces<PageResult<MatchHistoryItem>>().Produces(StatusCodes.Status401Unauthorized);
         history.MapGet("/{matchId:guid}",async(Guid matchId,ClaimsPrincipal user,PostgresGameManagementStore store,CancellationToken ct)=>
         {
             var detail=await store.GetDetailAsync(Subject(user),matchId,ct);
             return detail is null?Results.NotFound():Results.Ok(detail);
-        }).WithName("GetMatchHistoryDetail").WithSummary("Obtiene una partida únicamente si el usuario participó en ella.");
+        }).WithName("GetMatchHistoryDetail").WithSummary("Obtiene una partida únicamente si el usuario participó en ella.")
+            .Produces<MatchDetailView>().Produces(StatusCodes.Status401Unauthorized).Produces(StatusCodes.Status404NotFound);
         history.MapGet("/{matchId:guid}/events",async(Guid matchId,ClaimsPrincipal user,PostgresGameManagementStore store,CancellationToken ct)=>
         {
             string subject=Subject(user);var detail=await store.GetDetailAsync(subject,matchId,ct);if(detail is null)return Results.NotFound();
             var events=await store.GetReplayAsync(subject,matchId,ct);if(events is null)return Results.NotFound();
-            return Results.Ok(new{matchId,events=events.Select(item=>Sanitize(item,detail.RequestingPlayerId))});
-        }).WithName("ReplayMatchHistory").WithSummary("Reproduce eventos sin exponer planes, tiradas críticas ni subjects de autenticación.");
+            return Results.Ok(new MatchReplayView(matchId,events.Select(item=>Sanitize(item,detail.RequestingPlayerId)).ToArray()));
+        }).WithName("ReplayMatchHistory").WithSummary("Reproduce eventos sin exponer planes, tiradas críticas ni subjects de autenticación.")
+            .Produces<MatchReplayView>().Produces(StatusCodes.Status401Unauthorized).Produces(StatusCodes.Status404NotFound);
         return endpoints;
     }
 
@@ -33,7 +38,7 @@ public static class HistoryEndpoints
         {
             var resolution=resolutionElement.Deserialize<RoundResolution>()!;bool first=resolution.Match.FirstPlayer.PlayerId==requestingPlayer;
             var you=first?resolution.Match.FirstPlayer:resolution.Match.SecondPlayer;var opponent=first?resolution.Match.SecondPlayer:resolution.Match.FirstPlayer;
-            return new{item.Sequence,item.Type,item.Version,item.OccurredAt,roundNumber=item.Payload.GetProperty("before").GetProperty("roundNumber").GetInt32(),
+            return new{item.Sequence,item.Type,item.Version,item.OccurredAt,roundNumber=item.Payload.GetProperty("before").GetProperty("RoundNumber").GetInt32(),
                 yourDamage=first?resolution.FirstPlayerDamage:resolution.SecondPlayerDamage,opponentDamage=first?resolution.SecondPlayerDamage:resolution.FirstPlayerDamage,
                 yourCriticalHits=first?resolution.FirstPlayerCriticalHits:resolution.SecondPlayerCriticalHits,opponentCriticalHits=first?resolution.SecondPlayerCriticalHits:resolution.FirstPlayerCriticalHits,
                 yourAttacksBlocked=first?resolution.FirstPlayerAttacksBlocked:resolution.SecondPlayerAttacksBlocked,opponentAttacksBlocked=first?resolution.SecondPlayerAttacksBlocked:resolution.FirstPlayerAttacksBlocked,
