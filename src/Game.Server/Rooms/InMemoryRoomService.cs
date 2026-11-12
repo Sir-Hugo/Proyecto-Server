@@ -81,16 +81,22 @@ public sealed class InMemoryRoomService(MatchRoundService rounds, NpgsqlDataSour
             if (!room.Members.Any(m => m.Subject == subject)) return RoomOperationResult<RoomResponse>.Failure(403, "room_membership_required");
             await using (var update = new NpgsqlCommand("UPDATE room_members SET is_ready=$1 WHERE room_id=$2 AND auth_subject=$3", connection, tx))
             { update.Parameters.AddWithValue(ready); update.Parameters.AddWithValue(id); update.Parameters.AddWithValue(subject); await update.ExecuteNonQueryAsync(ct); }
-            Touch(id, connection, tx); await tx.CommitAsync(ct); room = Load(id);
-            if (room!.Members.Count == Capacity && room.Members.All(m => m.Ready))
+            Touch(id, connection, tx); await tx.CommitAsync(ct);
+            await using var startConnection = await source.OpenConnectionAsync(ct);
+            await using var startTransaction = await startConnection.BeginTransactionAsync(ct);
+            await using (var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", startConnection, startTransaction))
+            { gate.Parameters.AddWithValue(id.ToString("D")); await gate.ExecuteNonQueryAsync(ct); }
+            room = Load(id, startConnection, startTransaction, true);
+            if (room!.MatchId is null && room.Members.Count == Capacity && room.Members.All(m => m.Ready))
             {
                 var state = MatchState.Create(Guid.NewGuid(), room.Members[0].PlayerId, room.Members[1].PlayerId, Now());
                 try { await rounds.CreateAsync(state, room.Members.ToDictionary(m => m.Subject, m => m.PlayerId), ct); }
                 catch (MatchOperationException ex) { return RoomOperationResult<RoomResponse>.Failure(409, ex.Code); }
-                using var associate = source.CreateCommand("UPDATE rooms SET match_id=$1,status='active',last_activity_at=$2 WHERE id=$3 AND match_id IS NULL");
+                await using var associate = new NpgsqlCommand("UPDATE rooms SET match_id=$1,status='active',last_activity_at=$2 WHERE id=$3 AND match_id IS NULL",startConnection,startTransaction);
                 associate.Parameters.AddWithValue(state.MatchId); associate.Parameters.AddWithValue(Now()); associate.Parameters.AddWithValue(id);
                 if (await associate.ExecuteNonQueryAsync(ct) != 1) return RoomOperationResult<RoomResponse>.Failure(409, "match_already_started");
             }
+            await startTransaction.CommitAsync(ct);
             return RoomOperationResult<RoomResponse>.Success(ToResponse(Load(id)!, subject));
         }
         catch (PersistenceException) { return RoomOperationResult<RoomResponse>.Failure(503, "database_unavailable"); }

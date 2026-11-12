@@ -193,6 +193,45 @@ public sealed class HttpSignalRTests(PostgresFixture fixture) : IClassFixture<Po
         (await player.GetAsync("/api/history")).EnsureSuccessStatusCode();Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM admin_audit_log WHERE target_subject=$1",subject));
     }
 
+    [PostgresFact] public async Task SamePlayersStartRecoverAndFinishTwoConsecutiveRoomMatches()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();await using var app=new GameApplication(db.ConnectionString);
+        const string aliceSubject="auth0|consecutive-alice",bobSubject="auth0|consecutive-bob";
+        using var alice=app.Player(aliceSubject);using var bob=app.Player(bobSubject);
+        await using var hubA=app.Hub(aliceSubject);await using var hubB=app.Hub(bobSubject);await Task.WhenAll(hubA.StartAsync(),hubB.StartAsync());
+
+        async Task<Guid> StartRoomMatchAsync()
+        {
+            var createdResponse=await alice.PostAsJsonAsync("/api/rooms",new{visibility="private"});createdResponse.EnsureSuccessStatusCode();
+            var created=(await createdResponse.Content.ReadFromJsonAsync<CreatedRoomResponse>())!;
+            (await bob.PostAsJsonAsync($"/api/rooms/{created.Room.RoomId}/join",new{inviteCode=created.InviteCode})).EnsureSuccessStatusCode();
+            (await alice.PutAsJsonAsync($"/api/rooms/{created.Room.RoomId}/ready",new{isReady=true})).EnsureSuccessStatusCode();
+            var ready=await bob.PutAsJsonAsync($"/api/rooms/{created.Room.RoomId}/ready",new{isReady=true});ready.EnsureSuccessStatusCode();
+            return (await ready.Content.ReadFromJsonAsync<RoomResponse>())!.MatchId!.Value;
+        }
+
+        Guid first=await StartRoomMatchAsync();
+        await hubA.InvokeAsync("JoinMatch",new{type="match.join",version=1,matchId=first});await hubB.InvokeAsync("JoinMatch",new{type="match.join",version=1,matchId=first});
+        await hubA.InvokeAsync("SetMatchNickname",new{type="match.nickname.set",version=1,requestId=Guid.NewGuid(),matchId=first,nickname="Alice"});
+        await hubB.InvokeAsync("SetMatchNickname",new{type="match.nickname.set",version=1,requestId=Guid.NewGuid(),matchId=first,nickname="Bob"});
+        await hubB.InvokeAsync("AbandonMatch",first);
+
+        Guid second=await StartRoomMatchAsync();Assert.NotEqual(first,second);
+        var secondSnapshots=Channel.CreateUnbounded<JsonElement>();hubB.On<JsonElement>("match.state.snapshot",message=>secondSnapshots.Writer.TryWrite(message));
+        await hubB.InvokeAsync("JoinMatch",new{type="match.join",version=1,matchId=second});Assert.Equal(second,(await NextAsync(secondSnapshots)).GetProperty("matchId").GetGuid());
+        await using var reloadedAlice=app.Hub(aliceSubject);var recovered=Channel.CreateUnbounded<JsonElement>();reloadedAlice.On<JsonElement>("match.state.snapshot",message=>recovered.Writer.TryWrite(message));await reloadedAlice.StartAsync();
+        await reloadedAlice.InvokeAsync("ResumeMatch",new{type="match.resume",version=1,matchId=(Guid?)null,lastSequence=(long?)null});
+        var recoveredSnapshot=await NextAsync(recovered);Assert.Equal(second,recoveredSnapshot.GetProperty("matchId").GetGuid());Assert.NotEqual("completed",recoveredSnapshot.GetProperty("status").GetString());
+        await reloadedAlice.InvokeAsync("SetMatchNickname",new{type="match.nickname.set",version=1,requestId=Guid.NewGuid(),matchId=second,nickname="Alice2"});
+        await hubB.InvokeAsync("SetMatchNickname",new{type="match.nickname.set",version=1,requestId=Guid.NewGuid(),matchId=second,nickname="Bob2"});
+        await hubB.InvokeAsync("AbandonMatch",second);
+
+        var aliceHistory=await alice.GetFromJsonAsync<JsonElement>("/api/history?page=1&pageSize=10");var bobHistory=await bob.GetFromJsonAsync<JsonElement>("/api/history?page=1&pageSize=10");
+        Assert.Equal(2,aliceHistory.GetProperty("total").GetInt32());Assert.Equal(2,bobHistory.GetProperty("total").GetInt32());
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM matches WHERE id=$1 OR id=$2",first,second));
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM match_events WHERE event_type='match.ended' AND (match_id=$1 OR match_id=$2)",first,second));
+    }
+
     private static async Task<JsonElement> NextAsync(Channel<JsonElement> channel) =>
         await channel.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
     private static async Task<JsonElement> ActiveAsync(Channel<JsonElement> channel)

@@ -30,6 +30,27 @@ public sealed class Phase2CRecoveryTests(PostgresFixture fixture) : IClassFixtur
         Assert.False(snapshot.GetProperty("opponent").TryGetProperty("energy",out _));
     }
 
+    [PostgresFact] public async Task ConsecutiveMatchesReleasePreviousAssignmentAndRecoverOnlyTheActiveMatch()
+    {
+        await using var db=await fixture.CreateDatabaseAsync();var first=new LiveMatch(db);var firstService=await first.CreateAsync();
+        await firstService.AbandonAsync(first.Initial.MatchId,first.Bob);
+        Assert.Equal(0L,await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players"));
+        Assert.Null(await first.NewService().FindLatestMatchAsync(first.Alice));
+
+        var second=new LiveMatch(db);var secondService=await second.CreateAsync();
+        Assert.NotEqual(first.Initial.MatchId,second.Initial.MatchId);
+        Assert.Equal(second.Initial.MatchId,await second.NewService().FindLatestMatchAsync(second.Alice));
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM active_match_players WHERE match_id=$1",second.Initial.MatchId));
+
+        var simultaneous=new LiveMatch(db);
+        Assert.Equal("player_already_in_match",await ErrorAsync(()=>simultaneous.CreateAsync()));
+        await secondService.AbandonAsync(second.Initial.MatchId,second.Bob);
+        Assert.Equal("match_completed",await ErrorAsync(()=>secondService.AbandonAsync(second.Initial.MatchId,second.Bob)));
+        Assert.Null(await second.NewService().FindLatestMatchAsync(second.Alice));
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM matches WHERE id=$1 OR id=$2",first.Initial.MatchId,second.Initial.MatchId));
+        Assert.Equal(2L,await db.ScalarAsync<long>("SELECT count(*) FROM match_events WHERE event_type='match.ended' AND (match_id=$1 OR match_id=$2)",first.Initial.MatchId,second.Initial.MatchId));
+    }
+
     [PostgresFact] public async Task PlansSubmittedAcrossIndependentInstancesResolveOnce()
     {
         await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);var first=await game.CreateAsync();
@@ -93,5 +114,12 @@ public sealed class Phase2CRecoveryTests(PostgresFixture fixture) : IClassFixtur
         await using var db=await fixture.CreateDatabaseAsync();var game=new LiveMatch(db);var rooms=new InMemoryRoomService(game.NewService(),db.Source);var id=rooms.Create(game.Alice,"public").Value!.Room.RoomId;
         await db.ExecuteAsync("UPDATE rooms SET last_activity_at=CURRENT_TIMESTAMP-interval '10 minutes' WHERE id=$1",id);Assert.Equal(1,rooms.RemoveInactiveRooms(DateTimeOffset.UtcNow,TimeSpan.FromMinutes(5)));
         var restarted=new InMemoryRoomService(game.NewService(),db.Source);Assert.False((await restarted.GetAsync(id,game.Alice)).IsSuccess);Assert.DoesNotContain(restarted.ListPublicRooms(game.Bob),r=>r.RoomId==id);
+    }
+
+    private static async Task<string?> ErrorAsync(Func<Task> action)
+    {
+        try { await action(); return null; }
+        catch (Microsoft.AspNetCore.SignalR.HubException exception) { return exception.Message; }
+        catch (MatchOperationException exception) { return exception.Code; }
     }
 }

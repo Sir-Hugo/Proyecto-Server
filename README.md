@@ -96,7 +96,7 @@ dotnet build ProyectoServer.slnx --configuration Release
 dotnet test ProyectoServer.slnx
 ```
 
-Sin habilitación explícita, las 52 pruebas de dominio y servidor se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **90 pruebas PostgreSQL actuales**:
+Sin habilitación explícita, las 52 pruebas de dominio y servidor se ejecutan y las pruebas PostgreSQL figuran como omitidas. Para ejecutar también las **93 pruebas PostgreSQL actuales**:
 
 ```powershell
 $env:GAME_POSTGRES_TESTS = '1'
@@ -155,6 +155,12 @@ Configuración: `MatchLifecycle:RoundTimeoutMinutes`, `MatchLifecycle:Disconnect
 Los endpoints bajo `/api/admin` consultan partidas activas y conexiones de la instancia, terminan partidas, suspenden o rehabilitan usuarios y consultan auditoría. Exigen el permiso exacto `admin:game` en la claim `permissions`; un nombre de rol por sí solo no concede acceso. En Auth0 se debe crear ese permiso para la API, asignarlo mediante RBAC y habilitar **Add Permissions in the Access Token**. Las terminaciones y suspensiones se registran en `admin_audit_log`, protegido contra UPDATE, DELETE y TRUNCATE. Una suspensión se comprueba tanto en HTTP como en invocaciones SignalR.
 
 La implementación y su validación se describen en [docs/history-administration-validation.md](docs/history-administration-validation.md). Aplicarla en Azure requiere ejecutar primero la migración 004 mediante el Migration Job y luego desplegar una imagen nueva; estas operaciones no se realizan automáticamente.
+
+## Partidas consecutivas
+
+El cliente conserva en `localStorage` únicamente el identificador de una partida activa. Al completar una partida mantiene el resultado en pantalla, libera esa referencia activa y, al volver al lobby, descarta las referencias de navegación de la sala anterior. Los mensajes SignalR se validan por `matchId` y secuencia dentro de cada partida, de modo que una respuesta tardía de una partida terminada no puede reemplazar una partida nueva.
+
+La recuperación sin un ID explícito consulta exclusivamente `active_match_players`. Una partida finalizada permanece disponible en historial, pero no se selecciona automáticamente como sesión activa. La causa, regresiones y procedimiento de actualización están en [docs/consecutive-matches-validation.md](docs/consecutive-matches-validation.md).
 
 ## Contenedor e infraestructura — Fase 3A
 

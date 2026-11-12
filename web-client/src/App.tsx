@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
+import { advanceMatchCursor } from './matchSession'
 import './App.css'
 
 type RoomPlayer = { playerId: string; isOwner: boolean; isReady: boolean }
@@ -62,10 +63,54 @@ function App() {
   const [matchEndReason, setMatchEndReason] = useState<MatchEndReason>(null)
   const [nickname, setNickname] = useState('')
   const latestMatchSequence = useRef(-1)
+  const sequencedMatchId = useRef<string | null>(null)
+  const expectedMatchId = useRef<string | null>(recoveredMatchId)
+  const currentRoomId = useRef<string | null>(null)
 
-  const activeMatchId = quickMatchId ?? room?.matchId ?? recoveredMatchId
+  const roomMatchId = room?.status === 'Partida finalizada' ? null : room?.matchId
+  const activeMatchId = quickMatchId ?? roomMatchId ?? recoveredMatchId
 
   const serverUrl = import.meta.env.VITE_GAME_SERVER_URL?.replace(/\/+$/, '') ?? window.location.origin
+
+  const selectActiveMatch = useCallback((matchId: string) => {
+    const changedMatch = expectedMatchId.current !== matchId
+    expectedMatchId.current = matchId
+    if (changedMatch) {
+      sequencedMatchId.current = matchId
+      latestMatchSequence.current = -1
+    }
+    localStorage.setItem('game.activeMatchId', matchId)
+    setRecoveredMatchId(matchId)
+    setMatchSnapshot((current) => current?.matchId === matchId ? current : null)
+    setRoundResult(null)
+    setMatchEndReason(null)
+    setPlanPending(false)
+    setPlanCounts({ Attack: 0, Block: 0, Reserve: 0, SpecialAttack: 0 })
+  }, [])
+
+  const finishActiveMatch = useCallback((matchId: string) => {
+    if (localStorage.getItem('game.activeMatchId') === matchId)
+      localStorage.removeItem('game.activeMatchId')
+    setRecoveredMatchId((current) => current === matchId ? null : current)
+    setQuickMatchId((current) => current === matchId ? null : current)
+    setRoom((current) => current?.matchId === matchId
+      ? { ...current, status: 'Partida finalizada' }
+      : current)
+  }, [])
+
+  const acceptMatchMessage = useCallback((message: { matchId: string; sequence: number }, allowEqualSequence = false) => {
+    const decision = advanceMatchCursor(
+      { matchId: sequencedMatchId.current, sequence: latestMatchSequence.current },
+      expectedMatchId.current,
+      message,
+      allowEqualSequence,
+    )
+    if (!decision.accepted) return false
+    sequencedMatchId.current = decision.cursor.matchId
+    latestMatchSequence.current = decision.cursor.sequence
+    expectedMatchId.current = message.matchId
+    return true
+  }, [])
 
   // Abre y mantiene la conexión autenticada de SignalR mientras el usuario inició sesión.
   useEffect(() => {
@@ -107,53 +152,54 @@ function App() {
       })
       connection.on('match.found', (message: { matchId: string }) => {
         if (disposed) return
+        selectActiveMatch(message.matchId)
         setQuickMatchId(message.matchId)
         setQueueStatus('matched')
         setQueueRequestId(null)
       })
       connection.on('room.match.started', (message: { roomId: string; matchId: string }) => {
-        if (disposed) return
+        if (disposed || currentRoomId.current !== message.roomId) return
+        selectActiveMatch(message.matchId)
         setRoom((current) => current?.roomId === message.roomId
           ? { ...current, matchId: message.matchId, status: 'Partida en curso' }
           : current)
       })
       connection.on('match.state.snapshot', (message: MatchSnapshot) => {
         if (!disposed) {
-          if (message.sequence < latestMatchSequence.current) return
-          latestMatchSequence.current = message.sequence
-          localStorage.setItem('game.activeMatchId', message.matchId)
-          setRecoveredMatchId(message.matchId)
+          if (!acceptMatchMessage(message, true)) return
+          if (message.status === 'completed') finishActiveMatch(message.matchId)
+          else {
+            localStorage.setItem('game.activeMatchId', message.matchId)
+            setRecoveredMatchId(message.matchId)
+          }
           setMatchSnapshot(message)
           setMatchError(null)
           setPlanCounts({ Attack: 0, Block: 0, Reserve: 0, SpecialAttack: 0 })
           setPlanPending(message.hasSubmittedPlan)
         }
       })
-      connection.on('round.plan.accepted', (message: { sequence: number }) => {
-        if (!disposed && message.sequence >= latestMatchSequence.current) setPlanPending(true)
+      connection.on('round.plan.accepted', (message: { matchId: string; sequence: number }) => {
+        if (!disposed && message.matchId === expectedMatchId.current && message.sequence >= latestMatchSequence.current) setPlanPending(true)
       })
       connection.on('round.resolved', (message: MatchSnapshot & RoundResult) => {
         if (disposed) return
-        if (message.sequence <= latestMatchSequence.current) return
-        latestMatchSequence.current = message.sequence
+        if (!acceptMatchMessage(message)) return
         setMatchSnapshot({ ...message, roundNumber: message.status === 'active' ? message.roundNumber + 1 : message.roundNumber })
         setRoundResult(message)
         setPlanCounts({ Attack: 0, Block: 0, Reserve: 0, SpecialAttack: 0 })
         setPlanPending(false)
         setMatchError(null)
         setMatchEndReason(null)
-        if (message.status === 'completed')
-          setRoom((current) => current?.matchId === message.matchId ? { ...current, status: 'Partida finalizada' } : current)
+        if (message.status === 'completed') finishActiveMatch(message.matchId)
       })
       connection.on('match.ended', (message: MatchSnapshot & { reason: string }) => {
         if (disposed) return
-        if (message.sequence <= latestMatchSequence.current) return
-        latestMatchSequence.current = message.sequence
+        if (!acceptMatchMessage(message)) return
         setMatchSnapshot(message)
         setMatchEndReason(message.reason === 'abandonment' || message.reason === 'inactivity' ? message.reason : null)
         setRoundResult(null)
         setPlanPending(false)
-        setRoom((current) => current?.matchId === message.matchId ? { ...current, status: 'Partida finalizada' } : current)
+        finishActiveMatch(message.matchId)
       })
       connection.onclose((closeError) => {
         if (disposed) return
@@ -181,7 +227,7 @@ function App() {
       disposed = true
       if (connection) void connection.stop()
     }
-  }, [getAccessTokenSilently, isAuthenticated, serverUrl])
+  }, [acceptMatchMessage, finishActiveMatch, getAccessTokenSilently, isAuthenticated, selectActiveMatch, serverUrl])
 
   // Suscribe la conexión al aviso privado de inicio de la sala actual.
   useEffect(() => {
@@ -194,14 +240,17 @@ function App() {
   // Entra al canal privado cuando el servidor crea la partida desde una sala o la cola rápida.
   useEffect(() => {
     if (!activeMatchId || !hubConnection || hubStatus !== 'connected') return
+    if (expectedMatchId.current !== activeMatchId) selectActiveMatch(activeMatchId)
     void hubConnection.invoke('JoinMatch', { type: 'match.join', version: 1, matchId: activeMatchId }).catch((joinError: unknown) => {
       setMatchError(joinError instanceof Error ? joinError.message : 'No se pudo cargar la partida.')
     })
-  }, [activeMatchId, hubConnection, hubStatus])
+  }, [activeMatchId, hubConnection, hubStatus, selectActiveMatch])
 
   // Descubre la partida más reciente desde PostgreSQL cuando una pestaña nueva no conoce su identificador.
   useEffect(() => {
     if (activeMatchId || !hubConnection || hubStatus !== 'connected') return
+    // Una referencia local terminada no debe impedir que el servidor priorice otra partida activa.
+    expectedMatchId.current = null
     void hubConnection.invoke('ResumeMatch', {
       type: 'match.resume', version: 1, matchId: null,
       lastSequence: latestMatchSequence.current < 0 ? null : latestMatchSequence.current,
@@ -260,6 +309,7 @@ function App() {
   // Crea una sala con la visibilidad seleccionada.
   const createRoom = () => runRoomAction(async () => {
     const created = await apiRequest<CreatedRoom>('/api/rooms', 'POST', { visibility })
+    currentRoomId.current = created.room.roomId
     setRoom(created.room)
     setCreatedInviteCode(created.inviteCode)
     setRoomMessage('Sala creada.')
@@ -269,6 +319,7 @@ function App() {
   // Une al usuario a una sala pública o privada.
   const joinRoom = (roomId: string, code?: string) => runRoomAction(async () => {
     const joined = await apiRequest<Room>(`/api/rooms/${roomId}/join`, 'POST', { inviteCode: code ?? null })
+    currentRoomId.current = joined.roomId
     setRoom(joined)
     setCreatedInviteCode(null)
     setRoomMessage('Te uniste a la sala.')
@@ -277,7 +328,10 @@ function App() {
 
   // Cambia el estado de preparación del usuario en su sala actual.
   const setReady = (isReady: boolean) => room && runRoomAction(async () => {
-    setRoom(await apiRequest<Room>(`/api/rooms/${room.roomId}/ready`, 'PUT', { isReady }))
+    const updated = await apiRequest<Room>(`/api/rooms/${room.roomId}/ready`, 'PUT', { isReady })
+    if (currentRoomId.current !== updated.roomId) return
+    if (updated.matchId) selectActiveMatch(updated.matchId)
+    setRoom(updated)
   })
 
   // Actualiza los datos de la sala actual desde el servidor.
@@ -289,6 +343,7 @@ function App() {
   const leaveRoom = () => room && runRoomAction(async () => {
     await apiRequest(`/api/rooms/${room.roomId}/membership`, 'DELETE')
     await hubConnection?.invoke('LeaveRoom', { type: 'room.leave', version: 1, roomId: room.roomId })
+    currentRoomId.current = null
     setRoom(null)
     setCreatedInviteCode(null)
     setRoomMessage('Saliste de la sala.')
@@ -379,7 +434,14 @@ function App() {
 
   // Vuelve al lobby después de una partida terminada o para abandonar su vista actual.
   const returnToLobby = () => {
+    localStorage.removeItem('game.activeMatchId')
+    expectedMatchId.current = null
+    sequencedMatchId.current = null
+    latestMatchSequence.current = -1
+    currentRoomId.current = null
     setQuickMatchId(null)
+    setRecoveredMatchId(null)
+    setRoom(null)
     setQueueRequestId(null)
     setQueueStatus('idle')
     setMatchSnapshot(null)
@@ -391,7 +453,7 @@ function App() {
   if (isLoading) return <main className="auth-page"><section className="auth-card"><p>Comprobando sesión…</p></section></main>
   if (error) return <main className="auth-page"><section className="auth-card"><p className="error-message" role="alert">{error.message}</p></section></main>
 
-  if (isAuthenticated && activeMatchId && matchSnapshot) {
+  if (isAuthenticated && matchSnapshot) {
     const usedEnergy = Object.entries(planCounts).reduce((sum, [action, count]) => sum + count * (action === 'SpecialAttack' ? 3 : 1), 0)
     const remainingEnergy = matchSnapshot.you.energy - usedEnergy
     const actions: { id: PlanAction; label: string; detail: string; disabled?: boolean }[] = [
