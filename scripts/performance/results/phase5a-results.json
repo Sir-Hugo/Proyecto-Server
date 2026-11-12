@@ -1,0 +1,4406 @@
+{
+  "Commit": "9a2883e6c1e5518c19ff7760f258ce367632adce",
+  "StartedAtUtc": "2026-11-12T13:25:04.8940238+00:00",
+  "FinishedAtUtc": "2026-11-12T13:25:09.081233+00:00",
+  "WarmupCompleted": true,
+  "Environment": {
+    "OperatingSystem": "Microsoft Windows NT 10.0.26200.0",
+    "DotnetRuntime": "10.0.14",
+    "LogicalProcessors": 12,
+    "GcAvailableMemoryMiB": 24279.6796875,
+    "Process": "Game.Performance",
+    "ServerTransport": "Microsoft.AspNetCore.TestHost \u002B SignalR LongPolling",
+    "Database": "PostgreSQL 17.11 (Docker Compose)"
+  },
+  "Samples": [
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.create",
+      "DurationMs": 12.5481,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.join",
+      "DurationMs": 10.5182,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.get",
+      "DurationMs": 6.4886,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.connect",
+      "DurationMs": 6.5758,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.match.start",
+      "DurationMs": 32.4727,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 35.0302,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 45.0069,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 44.6212,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 39.0154,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 53.8144,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 30.8219,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 30.4949,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 31.0432,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 32.6261,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 34.0694,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 34.211,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 35.8445,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 35.9864,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 38.0426,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "DurationMs": 44.356,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 18.7074,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 18.2074,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 16.63,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 16.6392,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 21.023,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 20.2902,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 21.1732,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 11.8015,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 22.2088,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 32.0012,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 13.4969,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 15.4318,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 12.5172,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "DurationMs": 21.4569,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 17.3593,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 12.2669,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 13.1482,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 16.4622,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 18.1383,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 24.2911,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "DurationMs": 24.1279,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 15.4284,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 17.5624,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 36.3081,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 40.303,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 12.9645,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 29.4753,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 47.7032,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 47.8543,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "DurationMs": 41.5556,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 43.1346,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 46.0131,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 51.578,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 46.6884,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 44.8803,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 46.0449,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 63.3116,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 75.5586,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 75.5592,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "DurationMs": 74.9531,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 60.6869,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 60.692,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 60.8516,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 60.7705,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.4546,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.4947,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 64.1847,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 64.2625,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 64.6458,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 67.0616,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 57.7744,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 59.6583,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 60.5796,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.2195,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 63.1369,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 57.5118,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 63.4797,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 63.2714,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 64.021,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 63.8535,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 53.3953,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 53.3902,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 55.3809,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 58.1222,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 58.0124,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 57.8783,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 57.9358,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.1897,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.3634,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 62.525,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.3666,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.4261,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.4788,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.4495,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.7101,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.7908,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.7991,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 27.8308,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 28.3734,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 30.1394,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 19.464,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 21.1278,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 22.0213,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 20.381,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 22.6951,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 21.5856,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 22.3911,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 22.3781,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 23.3696,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 23.8218,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 27.3003,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 28.8976,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 29.0834,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 29.2741,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 33.7962,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 33.3392,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 34.0405,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 33.7375,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 34.2987,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "DurationMs": 34.5195,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.0015,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 17.9082,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 17.9079,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 18.4916,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.0133,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.9241,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 20.0911,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 20.0794,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 21.7857,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.1666,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 16.956,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 16.917,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 17.5962,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 10.1158,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.227,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 11.8596,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 10.7012,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 10.7013,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 17.8016,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 9.164,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 11.0193,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 11.6974,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.7357,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 9.1825,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.7549,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 11.7017,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 11.9148,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.9717,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 21.4412,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "DurationMs": 19.6285,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 14.2801,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 17.6754,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 25.2831,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 24.7063,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 24.4684,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 27.7744,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 29.7145,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 29.6474,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 31.0257,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 39.2565,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 36.5211,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 36.8426,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 37.0348,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 38.7294,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 39.1833,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 50.496,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 57.0049,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 31.1594,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 30.0131,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 30.6182,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 50.2012,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 32.645,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 32.1366,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 72.4913,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 37.6425,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 72.1578,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 50.2503,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "DurationMs": 77.0239,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 55.7741,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "DurationMs": 12.2589,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 74.8657,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 70.7558,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 85.5416,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 83.5193,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 85.1912,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 77.3999,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 97.2693,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 103.8785,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 101.1722,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 102.4655,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 99.9816,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 105.5713,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 112.209,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 153.4237,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 154.484,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 151.9771,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 141.1033,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 160.547,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 160.9294,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "DurationMs": 170.7312,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 80.4297,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 84.6535,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 86.8492,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 87.6613,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 87.4951,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 89.1064,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 90.876,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 90.776,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 91.0428,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 92.8778,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 93.0102,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 93.1119,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 93.6113,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 94.4321,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 94.3344,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 95.9504,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 96.4992,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 96.6018,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 96.9,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 97.7827,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 77.141,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 77.3772,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 77.4922,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 77.1666,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 80.4727,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 80.4237,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 80.5641,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 96.0106,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 96.8911,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 97.6801,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.8806,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.8746,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.6851,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.7354,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.7721,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.9301,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.8877,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 101.6927,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 102.4735,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "DurationMs": 106.993,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 38.1212,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 38.1765,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 40.1616,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 40.281,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 40.2391,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 40.664,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 41.2512,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 41.9804,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 41.3452,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 41.6192,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 41.9667,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.3489,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.0793,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.6024,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.89,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.3107,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.6351,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 42.9432,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 43.0679,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 53.7341,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 13.9003,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 15.3338,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 17.2141,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.6738,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.3403,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.2937,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 5.7048,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.7694,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.4732,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 5.5333,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.7279,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.1327,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.903,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.4755,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.6792,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.3196,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.4448,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.1118,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.4625,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5116,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 6.5307,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 5.9149,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.7365,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.6613,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.7784,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.6336,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.9671,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 4.1266,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.7366,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.2126,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.7129,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.9094,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.4681,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.907,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5919,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 6.4877,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.5073,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.6842,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.2077,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.3613,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5597,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.1794,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 5.8691,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 4.3269,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.7574,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 5.5789,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5955,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.3109,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.9367,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.2457,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 6.4055,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.5075,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5452,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.5297,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.3646,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.2697,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.909,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 4.3878,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.9971,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.5811,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 4.2339,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.5681,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.706,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.28,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.5029,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.5531,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.5588,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.3144,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.2935,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.4485,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 2.4062,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 4.3565,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "DurationMs": 3.8777,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "DurationMs": 3.0252,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "DurationMs": 5.6632,
+      "Success": true,
+      "HttpStatus": 200,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "DurationMs": 18.375,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "DurationMs": 19.6529,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "DurationMs": 19.8177,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "DurationMs": 20.1674,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "DurationMs": 20.7315,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "DurationMs": 20.9085,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "DurationMs": 21.9981,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "DurationMs": 22.1395,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "DurationMs": 22.0825,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "DurationMs": 24.097,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "DurationMs": 9.9123,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "DurationMs": 10.0357,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "DurationMs": 10.0377,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "DurationMs": 11.2218,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "DurationMs": 11.2483,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "DurationMs": 16.0198,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "DurationMs": 16.3978,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "DurationMs": 18.0955,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "DurationMs": 19.0896,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "DurationMs": 16.9084,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "DurationMs": 25.7776,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "DurationMs": 27.6514,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "DurationMs": 25.7704,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "DurationMs": 24.2929,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "DurationMs": 26.6357,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "DurationMs": 5.0216,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "DurationMs": 24.7837,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "DurationMs": 5.4091,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "DurationMs": 12.1407,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "DurationMs": 9.254,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "DurationMs": 7.5411,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "DurationMs": 6.412,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "DurationMs": 10.577,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "DurationMs": 4.327,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "DurationMs": 8.2397,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 35.8416,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 37.6282,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 37.6868,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 37.8464,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "DurationMs": 38.0347,
+      "Success": true,
+      "HttpStatus": null,
+      "Http429": false,
+      "Timeout": false,
+      "Error": null
+    }
+  ],
+  "Aggregates": [
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.match.start",
+      "Count": 1,
+      "SumSeconds": 0.0324727,
+      "P50Ms": 32.4727,
+      "P95Ms": 32.4727,
+      "P99Ms": 32.4727,
+      "MaxMs": 32.4727,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.create",
+      "Count": 1,
+      "SumSeconds": 0.0125481,
+      "P50Ms": 12.5481,
+      "P95Ms": 12.5481,
+      "P99Ms": 12.5481,
+      "MaxMs": 12.5481,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.get",
+      "Count": 1,
+      "SumSeconds": 0.0064886,
+      "P50Ms": 6.4886,
+      "P95Ms": 6.4886,
+      "P99Ms": 6.4886,
+      "MaxMs": 6.4886,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "http.room.join",
+      "Count": 1,
+      "SumSeconds": 0.0105182,
+      "P50Ms": 10.5182,
+      "P95Ms": 10.5182,
+      "P99Ms": 10.5182,
+      "MaxMs": 10.5182,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.connect",
+      "Count": 1,
+      "SumSeconds": 0.0065758,
+      "P50Ms": 6.5758,
+      "P95Ms": 6.5758,
+      "P99Ms": 6.5758,
+      "MaxMs": 6.5758,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "A-baseline",
+      "Operation": "signalr.round.all-clients",
+      "Count": 5,
+      "SumSeconds": 0.2174881,
+      "P50Ms": 44.6212,
+      "P95Ms": 52.0529,
+      "P99Ms": 53.4621,
+      "MaxMs": 53.8144,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.match.start",
+      "Count": 10,
+      "SumSeconds": 0.5677218,
+      "P50Ms": 49.1332,
+      "P95Ms": 75.55893,
+      "P99Ms": 75.559146,
+      "MaxMs": 75.5592,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.create",
+      "Count": 10,
+      "SumSeconds": 0.34749599999999997,
+      "P50Ms": 34.1402,
+      "P95Ms": 41.51496999999999,
+      "P99Ms": 43.787794000000005,
+      "MaxMs": 44.356,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.get",
+      "Count": 10,
+      "SumSeconds": 0.1547502,
+      "P50Ms": 14.46435,
+      "P95Ms": 21.432579999999994,
+      "P99Ms": 23.588836,
+      "MaxMs": 24.1279,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "http.room.join",
+      "Count": 10,
+      "SumSeconds": 0.20833729999999998,
+      "P50Ms": 20.656599999999997,
+      "P95Ms": 27.59461999999999,
+      "P99Ms": 31.119884,
+      "MaxMs": 32.0012,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.connect",
+      "Count": 10,
+      "SumSeconds": 0.3134459,
+      "P50Ms": 32.8917,
+      "P95Ms": 47.786305,
+      "P99Ms": 47.840701,
+      "MaxMs": 47.8543,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.match.abandon",
+      "Count": 10,
+      "SumSeconds": 0.2793646000000001,
+      "P50Ms": 27.75045,
+      "P95Ms": 29.344699999999996,
+      "P99Ms": 29.980459999999997,
+      "MaxMs": 30.1394,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "B-moderate",
+      "Operation": "signalr.round.all-clients",
+      "Count": 30,
+      "SumSeconds": 1.8248042000000002,
+      "P50Ms": 61.52065,
+      "P95Ms": 64.473315,
+      "P99Ms": 66.361018,
+      "MaxMs": 67.0616,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.match.start",
+      "Count": 20,
+      "SumSeconds": 2.2930166000000005,
+      "P50Ms": 103.172,
+      "P95Ms": 161.41949,
+      "P99Ms": 168.868858,
+      "MaxMs": 170.7312,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.create",
+      "Count": 20,
+      "SumSeconds": 0.5375224,
+      "P50Ms": 25.56105,
+      "P95Ms": 34.30974,
+      "P99Ms": 34.477548,
+      "MaxMs": 34.5195,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.get",
+      "Count": 20,
+      "SumSeconds": 0.41873879999999997,
+      "P50Ms": 13.097449999999998,
+      "P95Ms": 40.644125000000024,
+      "P99Ms": 69.74794499999994,
+      "MaxMs": 77.0239,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "http.room.join",
+      "Count": 20,
+      "SumSeconds": 0.3823992,
+      "P50Ms": 19.1968,
+      "P95Ms": 21.458425,
+      "P99Ms": 21.720245,
+      "MaxMs": 21.7857,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.connect",
+      "Count": 20,
+      "SumSeconds": 0.833335,
+      "P50Ms": 37.33865,
+      "P95Ms": 72.174475,
+      "P99Ms": 72.42793499999999,
+      "MaxMs": 72.4913,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.match.abandon",
+      "Count": 20,
+      "SumSeconds": 0.8404176999999998,
+      "P50Ms": 41.97355,
+      "P95Ms": 43.60121000000001,
+      "P99Ms": 51.70752199999998,
+      "MaxMs": 53.7341,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "C-high",
+      "Operation": "signalr.round.all-clients",
+      "Count": 40,
+      "SumSeconds": 3.6991459000000004,
+      "P50Ms": 93.97285,
+      "P95Ms": 101.95727,
+      "P99Ms": 105.230395,
+      "MaxMs": 106.993,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.detail",
+      "Count": 25,
+      "SumSeconds": 0.08425209999999998,
+      "P50Ms": 2.6842,
+      "P95Ms": 4.243399999999999,
+      "P99Ms": 12.692143999999978,
+      "MaxMs": 15.3338,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.history",
+      "Count": 25,
+      "SumSeconds": 0.11284920000000001,
+      "P50Ms": 3.8777,
+      "P95Ms": 5.90574,
+      "P99Ms": 11.983803999999985,
+      "MaxMs": 13.9003,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "D-persistence",
+      "Operation": "http.replay",
+      "Count": 25,
+      "SumSeconds": 0.1446852,
+      "P50Ms": 5.2935,
+      "P95Ms": 6.5221,
+      "P99Ms": 14.650083999999978,
+      "MaxMs": 17.2141,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.match.start",
+      "Count": 5,
+      "SumSeconds": 0.13012800000000002,
+      "P50Ms": 25.7776,
+      "P95Ms": 27.448259999999998,
+      "P99Ms": 27.610771999999997,
+      "MaxMs": 27.6514,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.create",
+      "Count": 5,
+      "SumSeconds": 0.0987445,
+      "P50Ms": 19.8177,
+      "P95Ms": 20.61868,
+      "P99Ms": 20.708936,
+      "MaxMs": 20.7315,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.get",
+      "Count": 5,
+      "SumSeconds": 0.052455800000000004,
+      "P50Ms": 10.0377,
+      "P95Ms": 11.243,
+      "P99Ms": 11.24724,
+      "MaxMs": 11.2483,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "http.room.join",
+      "Count": 5,
+      "SumSeconds": 0.11122559999999998,
+      "P50Ms": 22.0825,
+      "P95Ms": 23.7055,
+      "P99Ms": 24.018700000000003,
+      "MaxMs": 24.097,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.connect",
+      "Count": 5,
+      "SumSeconds": 0.08651110000000001,
+      "P50Ms": 16.9084,
+      "P95Ms": 18.89078,
+      "P99Ms": 19.049836,
+      "MaxMs": 19.0896,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.match.abandon",
+      "Count": 5,
+      "SumSeconds": 0.18703769999999997,
+      "P50Ms": 37.6868,
+      "P95Ms": 37.99704,
+      "P99Ms": 38.027168,
+      "MaxMs": 38.0347,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.reconnect.transport",
+      "Count": 5,
+      "SumSeconds": 0.030423699999999998,
+      "P50Ms": 5.4091,
+      "P95Ms": 8.685599999999999,
+      "P99Ms": 9.14032,
+      "MaxMs": 9.254,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    },
+    {
+      "Scenario": "E-reconnect",
+      "Operation": "signalr.resume.snapshot",
+      "Count": 5,
+      "SumSeconds": 0.0632822,
+      "P50Ms": 10.577,
+      "P95Ms": 22.2551,
+      "P99Ms": 24.27798,
+      "MaxMs": 24.7837,
+      "Errors": 0,
+      "Http429": 0,
+      "Timeouts": 0,
+      "ErrorRatePercent": 0
+    }
+  ],
+  "ScenarioResources": [
+    {
+      "Scenario": "A-baseline",
+      "SyntheticUsers": 2,
+      "ConcurrentMatches": 1,
+      "WallSeconds": 0.3709211,
+      "ApproximateCpuPercent": 7.191730381288284,
+      "PeakWorkingSetMiB": 91.8828125,
+      "FinalWorkingSetMiB": 91.81640625
+    },
+    {
+      "Scenario": "B-moderate",
+      "SyntheticUsers": 20,
+      "ConcurrentMatches": 10,
+      "WallSeconds": 0.5202023,
+      "ApproximateCpuPercent": 18.401369132524717,
+      "PeakWorkingSetMiB": 100.23046875,
+      "FinalWorkingSetMiB": 100.23046875
+    },
+    {
+      "Scenario": "C-high",
+      "SyntheticUsers": 40,
+      "ConcurrentMatches": 20,
+      "WallSeconds": 0.7578668,
+      "ApproximateCpuPercent": 20.459741187220185,
+      "PeakWorkingSetMiB": 110.1484375,
+      "FinalWorkingSetMiB": 110.26171875
+    },
+    {
+      "Scenario": "D-persistence",
+      "SyntheticUsers": 25,
+      "ConcurrentMatches": 0,
+      "WallSeconds": 0.3474524,
+      "ApproximateCpuPercent": 6.638124971500317,
+      "PeakWorkingSetMiB": 111.23046875,
+      "FinalWorkingSetMiB": 111.23046875
+    },
+    {
+      "Scenario": "E-reconnect",
+      "SyntheticUsers": 10,
+      "ConcurrentMatches": 5,
+      "WallSeconds": 0.3343829,
+      "ApproximateCpuPercent": 8.04125533424714,
+      "PeakWorkingSetMiB": 111.4609375,
+      "FinalWorkingSetMiB": 111.42578125
+    }
+  ],
+  "CompletedMatches": [
+    {
+      "MatchId": "71ca8cb4-2624-4fec-b319-1a6c8b46b94a",
+      "Subject": "perf|A-baseline-0|alice"
+    },
+    {
+      "MatchId": "54002fa6-1cd5-49a8-93a1-0270d3b3006d",
+      "Subject": "perf|B-moderate-0|alice"
+    },
+    {
+      "MatchId": "f1a1cc61-94f5-4600-b804-22c6dcc13305",
+      "Subject": "perf|B-moderate-1|alice"
+    },
+    {
+      "MatchId": "be2c7981-eadb-495c-a2d2-b0a09d871af4",
+      "Subject": "perf|B-moderate-2|alice"
+    },
+    {
+      "MatchId": "81189bfd-8d22-4e29-af7a-2adc1d61c9ba",
+      "Subject": "perf|B-moderate-3|alice"
+    },
+    {
+      "MatchId": "15f78e42-cd55-45ae-b4f0-29c51767a7b4",
+      "Subject": "perf|B-moderate-4|alice"
+    },
+    {
+      "MatchId": "3f2207b7-64b9-4784-91e6-91ae55d682f0",
+      "Subject": "perf|B-moderate-5|alice"
+    },
+    {
+      "MatchId": "d34066b1-e314-4c01-81e9-a23a1c5ded6e",
+      "Subject": "perf|B-moderate-6|alice"
+    },
+    {
+      "MatchId": "9fb66268-4177-4e2b-90b5-3bce984afe13",
+      "Subject": "perf|B-moderate-7|alice"
+    },
+    {
+      "MatchId": "ec0c5a88-2d71-4db0-b44f-05a4147be87a",
+      "Subject": "perf|B-moderate-8|alice"
+    },
+    {
+      "MatchId": "65a2276d-c3cf-4289-99ea-c17156e99cb1",
+      "Subject": "perf|B-moderate-9|alice"
+    },
+    {
+      "MatchId": "e3431161-3986-4357-a7ad-a18da64e0033",
+      "Subject": "perf|C-high-0|alice"
+    },
+    {
+      "MatchId": "33adf123-e2dc-4324-acc5-956102c38f89",
+      "Subject": "perf|C-high-1|alice"
+    },
+    {
+      "MatchId": "c2eddaa8-df05-4165-8f4f-ec9ba29483a3",
+      "Subject": "perf|C-high-2|alice"
+    },
+    {
+      "MatchId": "294a53d9-299f-414d-8ebd-11929d4dfaf9",
+      "Subject": "perf|C-high-3|alice"
+    },
+    {
+      "MatchId": "1b4c9775-daf2-435c-a051-02c578054c1d",
+      "Subject": "perf|C-high-4|alice"
+    },
+    {
+      "MatchId": "c61182af-9997-4b93-961f-a78a1f3c9015",
+      "Subject": "perf|C-high-5|alice"
+    },
+    {
+      "MatchId": "2675d242-a682-4069-8bfb-683e3c7ece68",
+      "Subject": "perf|C-high-6|alice"
+    },
+    {
+      "MatchId": "5d2c12b7-2634-405d-a396-6f7ab2464be3",
+      "Subject": "perf|C-high-7|alice"
+    },
+    {
+      "MatchId": "1ef811f0-55c8-406e-b79a-8ba3703d5e38",
+      "Subject": "perf|C-high-8|alice"
+    },
+    {
+      "MatchId": "50d40483-7c54-4704-9115-5a38d853452d",
+      "Subject": "perf|C-high-9|alice"
+    },
+    {
+      "MatchId": "fb319769-6464-427b-99c7-a75f2769a3d7",
+      "Subject": "perf|C-high-10|alice"
+    },
+    {
+      "MatchId": "045f5b10-d5d1-44ca-9b1f-611cfa86e8fc",
+      "Subject": "perf|C-high-11|alice"
+    },
+    {
+      "MatchId": "eb2dd2cf-cf92-4b22-914b-8afe0dc8a35e",
+      "Subject": "perf|C-high-12|alice"
+    },
+    {
+      "MatchId": "1110b5a2-e6f4-475a-bbb6-107d0e56efa6",
+      "Subject": "perf|C-high-13|alice"
+    },
+    {
+      "MatchId": "354906ef-ea04-4378-9f4f-07e3d5b535ae",
+      "Subject": "perf|C-high-14|alice"
+    },
+    {
+      "MatchId": "8e5d6dec-d864-4bbd-a062-de4e48b13bd3",
+      "Subject": "perf|C-high-15|alice"
+    },
+    {
+      "MatchId": "2aba2987-9f06-47eb-8970-866ff9296720",
+      "Subject": "perf|C-high-16|alice"
+    },
+    {
+      "MatchId": "76a9de7b-4ed9-4c0e-a4f7-25a402688e05",
+      "Subject": "perf|C-high-17|alice"
+    },
+    {
+      "MatchId": "2f6f231b-b94d-4b8d-b415-b597c3d7d205",
+      "Subject": "perf|C-high-18|alice"
+    },
+    {
+      "MatchId": "86959201-10ab-449b-8ded-cb5f0c4b5ec3",
+      "Subject": "perf|C-high-19|alice"
+    },
+    {
+      "MatchId": "6dd7755c-0bda-40a0-94ff-e6e16b6f9059",
+      "Subject": "perf|reconnect-0|alice"
+    },
+    {
+      "MatchId": "ab0d7d0a-2b88-432b-b76a-4f5d2202d38e",
+      "Subject": "perf|reconnect-1|alice"
+    },
+    {
+      "MatchId": "e55ee984-aeb8-4636-a006-05822c3def06",
+      "Subject": "perf|reconnect-2|alice"
+    },
+    {
+      "MatchId": "c488130a-e31d-4818-aa24-735ce60a6bb3",
+      "Subject": "perf|reconnect-3|alice"
+    },
+    {
+      "MatchId": "b4e95996-f6ee-4e62-b926-9a0811ed3c16",
+      "Subject": "perf|reconnect-4|alice"
+    }
+  ],
+  "SkippedScenarios": [],
+  "Database": {
+    "ActiveMatches": 0,
+    "PendingPlans": 0,
+    "CommandsWithoutOutcome": 0,
+    "DuplicateEventSequences": 0,
+    "TotalMatches": 37,
+    "TotalEvents": 149
+  },
+  "RemainingConnections": 0
+}
