@@ -2,8 +2,10 @@ using Game.Domain;
 using Game.Infrastructure;
 using Game.Server.Contracts.V1;
 using Game.Server.Hubs;
+using Game.Server.Observability;
 using Microsoft.AspNetCore.SignalR;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -11,24 +13,29 @@ using System.Text.RegularExpressions;
 namespace Game.Server.Rooms;
 
 public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSource criticalSource,
-    IMatchSessionStore store, IConfiguration? configuration = null, ILogger<MatchRoundService>? logger = null)
+    IMatchSessionStore store, IConfiguration? configuration = null, ILogger<MatchRoundService>? logger = null,
+    GameTelemetry? telemetry = null)
 {
     // Transport routing only; confirmed game state is loaded from PostgreSQL.
     private readonly ConcurrentDictionary<(Guid MatchId, string Subject), string> connections = [];
     private readonly ConcurrentDictionary<(Guid MatchId, string Subject), DateTimeOffset> reconnectGrace = [];
     private sealed record Notification(string Subject, string Event, JsonElement Message);
-    private sealed record SubmissionResult(JsonElement Acknowledgement, IReadOnlyList<Notification> Outcomes);
+    private sealed record SubmissionResult(JsonElement Acknowledgement, IReadOnlyList<Notification> Outcomes,
+        bool IsNew, Guid PlayerId, double? ResolutionMilliseconds = null, int? ResolvedRound = null);
     private readonly TimeSpan roundTimeout = TimeSpan.FromMinutes(configuration?.GetValue("MatchLifecycle:RoundTimeoutMinutes", 5) ?? 5);
     private readonly TimeSpan disconnectGrace = TimeSpan.FromSeconds(configuration?.GetValue("MatchLifecycle:DisconnectGraceSeconds", 30) ?? 30);
 
     public async Task CreateAsync(MatchState match, IReadOnlyDictionary<string, Guid> participants, CancellationToken ct = default)
     {
+        using Activity? activity = GameTelemetry.Activities.StartActivity("match.create", ActivityKind.Internal);
+        activity?.SetTag("game.match.id", match.MatchId);
         match = match with { LastActivityAt = Microseconds(match.LastActivityAt) };
         var session = new MatchSession(match, participants);
         session.RoundDeadlineAt = match.LastActivityAt.Add(roundTimeout);
         session.NewEvents.Add(new(match.MatchId, match.SequenceNumber, "match.started", 1, match.LastActivityAt,
             JsonSerializer.SerializeToElement(new { state = match, reason = "created" })));
         await store.CreateAsync(session, ct);
+        logger?.LogInformation("Match {MatchId} created", match.MatchId);
     }
     public async Task<MatchStatus?> GetMatchStatusAsync(Guid matchId, CancellationToken ct = default) =>
         (await store.ReadAsync(matchId, ct))?.Match.Status;
@@ -64,6 +71,9 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
 
     public Task SubmitAsync(string subject, string connectionId, SubmitRoundPlanMessage message, CancellationToken ct = default) => HubGuardAsync(async () =>
     {
+        long processingStarted = Stopwatch.GetTimestamp();
+        using Activity? activity = GameTelemetry.Activities.StartActivity("round.plan.submit", ActivityKind.Internal);
+        activity?.SetTag("game.match.id", message.MatchId);
         var validation = SubmitRoundPlanMessageValidator.Validate(message);
         if (!validation.IsValid) throw new HubException($"invalid_message:{validation.Issues[0].Code}");
         var request = validation.Request!;
@@ -77,7 +87,7 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
             {
                 if (!CryptographicOperations.FixedTimeEquals(previous.Fingerprint, fingerprint)) throw new HubException("idempotency_key_reused");
                 return new SubmissionResult(previous.Acknowledgement, previous.Outcome is null ? [] :
-                    [new(subject, previous.Outcome.EventName, previous.Outcome.Message)]);
+                    [new(subject, previous.Outcome.EventName, previous.Outcome.Message)], false, session.Participants[subject]);
             }
             RequireActive(session);
             if (session.Nicknames.Count != 2) throw new HubException("nicknames_required");
@@ -94,14 +104,16 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
                 requestId = request.RequestId, sequence = session.Match.SequenceNumber });
             session.Submissions.Add(key, new(fingerprint, ack));
             session.PendingPlans.Add(subject, new(plan, key));
-            if (session.PendingPlans.Count != 2) return new SubmissionResult(ack, []);
+            if (session.PendingPlans.Count != 2) return new SubmissionResult(ack, [], true, plan.PlayerId);
 
             var before = session.Match;
             string first = session.Participants.Single(pair => pair.Value == before.FirstPlayer.PlayerId).Key;
             string second = session.Participants.Single(pair => pair.Value == before.SecondPlayer.PlayerId).Key;
             var firstPending = session.PendingPlans[first]; var secondPending = session.PendingPlans[second];
             var rolls = new RecordingCriticalSource(criticalSource);
+            long resolutionStarted = Stopwatch.GetTimestamp();
             var resolution = new RoundResolver(rolls).Resolve(before, firstPending.Plan, secondPending.Plan, CaptureTime());
+            double resolutionMilliseconds = Stopwatch.GetElapsedTime(resolutionStarted).TotalMilliseconds;
             session.Match = resolution.Match;
             session.RoundDeadlineAt = session.Match.Status == MatchStatus.Active ? session.Match.LastActivityAt.Add(roundTimeout) : null;
             if (session.Match.Status == MatchStatus.Finished)
@@ -121,8 +133,22 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
             }
             session.PendingPlans.Clear();
             Enqueue(session, outcomes, session.Match.SequenceNumber);
-            return new SubmissionResult(ack, outcomes);
+            return new SubmissionResult(ack, outcomes, true, plan.PlayerId, resolutionMilliseconds, before.RoundNumber);
         }, ct);
+        activity?.SetTag("game.player.id", response.PlayerId);
+        activity?.SetTag("game.round.plan.new", response.IsNew);
+        if (response.IsNew)
+        {
+            telemetry?.RecordRoundPlanProcessed(Stopwatch.GetElapsedTime(processingStarted).TotalMilliseconds);
+            logger?.LogInformation("Round plan accepted for match {MatchId}, player {PlayerId}", request.MatchId, response.PlayerId);
+        }
+        if (response.ResolutionMilliseconds is double resolutionMilliseconds)
+        {
+            telemetry?.RecordRoundResolved(resolutionMilliseconds);
+            activity?.SetTag("game.round.number", response.ResolvedRound);
+            logger?.LogInformation("Round {RoundNumber} resolved for match {MatchId} in {DurationMilliseconds:F2} ms",
+                response.ResolvedRound, request.MatchId, resolutionMilliseconds);
+        }
         connections[(request.MatchId, subject)] = connectionId;
         await PublishAsync(request.MatchId, [new(subject, "round.plan.accepted", response.Acknowledgement)], ct);
         await PublishAsync(request.MatchId, response.Outcomes, ct);
@@ -130,11 +156,14 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
 
     public Task AbandonAsync(Guid matchId, string subject, CancellationToken ct = default) => HubGuardAsync(async () =>
     {
+        using Activity? activity = GameTelemetry.Activities.StartActivity("match.abandon", ActivityKind.Internal);
+        activity?.SetTag("game.match.id", matchId);
         var notifications = await store.MutateAsync(matchId, session =>
         {
             Authorize(session, subject); RequireActive(session);
             return Finish(session, session.Participants.Single(pair => pair.Key != subject).Value, "abandonment", CaptureTime());
         }, ct);
+        logger?.LogInformation("Match {MatchId} finished because of abandonment", matchId);
         await PublishAsync(matchId, notifications, ct);
     });
 
@@ -230,13 +259,21 @@ public sealed class MatchRoundService(IHubContext<GameHub> hub, ICriticalHitSour
     {
         if (session.Match.Status != MatchStatus.Active) throw new HubException("match_completed");
     }
-    private static async Task HubGuardAsync(Func<Task> operation)
+    private async Task HubGuardAsync(Func<Task> operation)
     { await HubGuardAsync(async () => { await operation(); return true; }); }
-    private static async Task<T> HubGuardAsync<T>(Func<Task<T>> operation)
+    private async Task<T> HubGuardAsync<T>(Func<Task<T>> operation)
     {
         try { return await operation(); }
-        catch (PersistenceException) { throw new HubException("database_unavailable"); }
-        catch (MatchOperationException exception) { throw new HubException(exception.Code); }
+        catch (PersistenceException)
+        {
+            telemetry?.RecordFailure("game_operation", "persistence");
+            throw new HubException("database_unavailable");
+        }
+        catch (MatchOperationException exception)
+        {
+            telemetry?.RecordFailure("game_operation", "conflict");
+            throw new HubException(exception.Code);
+        }
     }
     private static DateTimeOffset Microseconds(DateTimeOffset value) => new(value.UtcTicks - value.UtcTicks % 10, TimeSpan.Zero);
     private static DateTimeOffset CaptureTime() => Microseconds(DateTimeOffset.UtcNow);

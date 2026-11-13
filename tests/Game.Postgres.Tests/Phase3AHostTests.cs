@@ -20,6 +20,13 @@ public sealed class Phase3AHostTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.DoesNotContain("Password",await ready.Content.ReadAsStringAsync(),StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact] public async Task StartsAndServesLivenessWithoutApplicationInsightsConnectionString()
+    {
+        await using var app = new DeploymentApplication("Host=127.0.0.1;Port=1;Database=missing;Username=none;Password=none;Timeout=1;Command Timeout=1");
+        using var client = app.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
+    }
+
     [PostgresFact] public async Task ReadinessIsHealthyWithMigratedPostgres()
     {
         await using var db=await fixture.CreateDatabaseAsync();await using var app=new DeploymentApplication(db.ConnectionString);
@@ -85,7 +92,8 @@ public sealed class Phase3AHostTests(PostgresFixture fixture) : IClassFixture<Po
             {
                 ["ConnectionStrings:GameDatabase"]=connectionString,["Cors:AllowedOrigins:0"]="https://game.test",
                 ["Authentication:Authority"]="https://identity.test/",["Authentication:Audience"]="game-api",
-                ["Auth0:ClientId"]=includeClientId?"public-client":null
+                ["Auth0:ClientId"]=includeClientId?"public-client":null,
+                ["APPLICATIONINSIGHTS_CONNECTION_STRING"]=null
             }));
         }
     }

@@ -5,11 +5,15 @@ using Game.Server.Administration;
 using Game.Server.Health;
 using Game.Server.History;
 using Game.Server.Hubs;
+using Game.Server.Observability;
 using Game.Server.Rooms;
 using Game.Server.Security;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Headers;
 using Microsoft.AspNetCore.SignalR;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +28,12 @@ if (production && (string.IsNullOrWhiteSpace(authority) || string.IsNullOrWhiteS
     throw new InvalidOperationException("Production requires Authentication:Authority, Authentication:Audience and Auth0:ClientId.");
 
 builder.Services.AddGamePostgres(builder.Configuration);
+builder.Services.AddSingleton<GameTelemetry>();
+var telemetry = builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing.AddSource(GameTelemetry.ActivitySourceName).AddSource("Npgsql"))
+    .WithMetrics(metrics => metrics.AddMeter(GameTelemetry.MeterName));
+if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    telemetry.UseAzureMonitor();
 const string webClientCorsPolicy = "WebClient";
 string[] allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (allowedOrigins.Length == 0)
@@ -49,6 +59,7 @@ builder.Services.AddHostedService<RoomExpirationService>();
 builder.Services.AddHostedService<MatchmakingExpirationService>();
 builder.Services.AddHostedService<MatchExpirationService>();
 builder.Services.AddHostedService<OutboxDeliveryService>();
+builder.Services.AddHostedService<GameMetricsCollector>();
 builder.Services.AddSignalR(options =>
 {
     options.MaximumReceiveMessageSize = 8 * 1024;
