@@ -72,7 +72,8 @@ function App() {
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [lobbyBannerIndex, setLobbyBannerIndex] = useState(0)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminSubject, setAdminSubject] = useState<string | null>(null)
+  const isAdmin = isAuthenticated && Boolean(user?.sub) && adminSubject === user?.sub
   const [showAdmin, setShowAdmin] = useState(false)
   const [adminMatches, setAdminMatches] = useState<AdminMatch[]>([])
   const [adminConnections, setAdminConnections] = useState<AdminConnection[]>([])
@@ -318,17 +319,18 @@ function App() {
 
   // Confirma el permiso administrativo consultando un endpoint protegido por el servidor.
   useEffect(() => {
-    if (!isAuthenticated || !serverUrl) { setIsAdmin(false); return }
+    if (!isAuthenticated || !serverUrl || !user?.sub) return
+    const subject = user.sub
     let cancelled = false
     void (async () => {
       try {
         const token = await getAccessTokenSilently()
         const response = await fetch(`${serverUrl}/api/admin/connections`, { headers: { Authorization: `Bearer ${token}` } })
-        if (!cancelled) setIsAdmin(response.ok)
-      } catch { if (!cancelled) setIsAdmin(false) }
+        if (!cancelled) setAdminSubject(response.ok ? subject : null)
+      } catch { if (!cancelled) setAdminSubject(null) }
     })()
     return () => { cancelled = true }
-  }, [getAccessTokenSilently, hubStatus, isAuthenticated, serverUrl])
+  }, [getAccessTokenSilently, hubStatus, isAuthenticated, serverUrl, user?.sub])
 
   // Carga las partidas activas y las conexiones visibles para el administrador.
   const refreshAdminData = async () => {
