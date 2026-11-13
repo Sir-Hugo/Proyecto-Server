@@ -4,6 +4,9 @@
     <Project Path="src/Game.Infrastructure/Game.Infrastructure.csproj" />
     <Project Path="src/Game.Server/Game.Server.csproj" />
   </Folder>
+  <Folder Name="/scripts/">
+    <Project Path="scripts/bot/Game.Bot/Game.Bot.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Game.Domain.Tests/Game.Domain.Tests.csproj" />
     <Project Path="tests/Game.Postgres.Tests/Game.Postgres.Tests.csproj" />

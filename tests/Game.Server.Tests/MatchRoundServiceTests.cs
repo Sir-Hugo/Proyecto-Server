@@ -3,8 +3,10 @@ using Game.Domain;
 using Game.Infrastructure;
 using Game.Server.Contracts.V1;
 using Game.Server.Hubs;
+using Game.Server.Observability;
 using Game.Server.Rooms;
 using Microsoft.AspNetCore.SignalR;
+using System.Diagnostics.Metrics;
 
 namespace Game.Server.Tests;
 
@@ -40,12 +42,12 @@ public sealed class MatchRoundServiceTests
         public RecordingHub Hub { get; } = new();
         public MatchState Match { get; }
         public MatchRoundService Service { get; }
-        public Fixture(MatchState? match = null)
+        public Fixture(MatchState? match = null, GameTelemetry? telemetry = null)
         {
             Match = match ?? MatchState.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
             var store = new InMemoryMatchSessionStore();
             store.Seed(new(Match, new Dictionary<string, Guid> { ["alice"] = Match.FirstPlayer.PlayerId, ["bob"] = Match.SecondPlayer.PlayerId }));
-            Service = new(Hub, new FixedRoll(), store);
+            Service = new(Hub, new FixedRoll(), store, telemetry: telemetry);
         }
         public async Task Ready()
         { await Service.SetNicknameAsync(Match.MatchId, "alice", "a", "Alice"); await Service.SetNicknameAsync(Match.MatchId, "bob", "b", "Bob"); Hub.Messages.Clear(); }
@@ -75,6 +77,27 @@ public sealed class MatchRoundServiceTests
         Assert.All(f.Hub.Messages, m => Assert.Equal("retry", m.Connection));
         Assert.Equal(ack, f.Hub.Messages[0].Payload.GetRawText()); Assert.Equal(outcome, f.Hub.Messages[1].Payload.GetRawText());
         Assert.Equal(1, f.Snapshot().GetProperty("sequence").GetInt64()); Assert.Equal(45, f.Snapshot().GetProperty("you").GetProperty("health").GetInt32());
+    }
+    [Fact] public async Task IdenticalRetryIsExcludedFromProcessedPlanMetric()
+    {
+        using var telemetry = new GameTelemetry();
+        long processed = 0;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == GameTelemetry.MeterName) meterListener.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, measurement, tags, state) =>
+        {
+            if (instrument.Name == "game.round_plans.processed") Interlocked.Add(ref processed, measurement);
+        });
+        listener.Start();
+
+        var f = new Fixture(telemetry: telemetry); await f.Ready(); var command = f.Command();
+        await f.Service.SubmitAsync("alice", "a", command);
+        await f.Service.SubmitAsync("alice", "retry", command);
+
+        Assert.Equal(1, processed);
     }
     [Fact] public async Task ChangedContentCannotReuseRequestId()
     {
