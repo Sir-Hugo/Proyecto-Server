@@ -34,6 +34,11 @@ type MatchSnapshot = {
 type PlanAction = 'Attack' | 'Block' | 'Reserve' | 'SpecialAttack'
 type RoundResult = { roundNumber: number; yourDamage: number; opponentDamage: number; yourCriticalHits: number; opponentCriticalHits: number; yourAttacksBlocked: number; opponentAttacksBlocked: number }
 type MatchEndReason = 'inactivity' | 'abandonment' | null
+type HistoryEntry = { matchId: string; status: string; roundNumber: number; result: 'active' | 'won' | 'lost' | 'draw'; opponentNickname: string | null; createdAt: string; completedAt: string | null; terminalReason: string | null }
+type MatchHistory = { items: HistoryEntry[]; page: number; pageSize: number; total: number }
+type AdminMatch = { matchId: string; roundNumber: number; sequence: number; lastActivityAt: string; roundDeadlineAt: string | null; participantSubjects: string[] }
+type AdminConnection = { connectionId: string; subject: string; connectedAt: string }
+const lobbyBanners = ['/assets/banner/banner.jpg', '/assets/banner/bannerS2.jpg', '/assets/banner/bannerS3.jpg']
 
 // Renderiza el inicio de sesión, el estado de conexión y las opciones de sala y emparejamiento.
 function App() {
@@ -62,10 +67,29 @@ function App() {
   const [matchError, setMatchError] = useState<string | null>(null)
   const [matchEndReason, setMatchEndReason] = useState<MatchEndReason>(null)
   const [nickname, setNickname] = useState('')
+  const [history, setHistory] = useState<MatchHistory | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [lobbyBannerIndex, setLobbyBannerIndex] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [adminMatches, setAdminMatches] = useState<AdminMatch[]>([])
+  const [adminConnections, setAdminConnections] = useState<AdminConnection[]>([])
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [adminBusy, setAdminBusy] = useState(false)
+  const [suspendSubject, setSuspendSubject] = useState('')
+  const [suspendReason, setSuspendReason] = useState('')
   const latestMatchSequence = useRef(-1)
   const sequencedMatchId = useRef<string | null>(null)
   const expectedMatchId = useRef<string | null>(recoveredMatchId)
   const currentRoomId = useRef<string | null>(null)
+
+  // Alterna las imágenes del banner cada tres segundos mientras la aplicación está abierta.
+  useEffect(() => {
+    const timer = window.setInterval(() => setLobbyBannerIndex((index) => (index + 1) % lobbyBanners.length), 3000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const roomMatchId = room?.status === 'Partida finalizada' ? null : room?.matchId
   const activeMatchId = quickMatchId ?? roomMatchId ?? recoveredMatchId
@@ -292,6 +316,52 @@ function App() {
     return response.json() as Promise<T>
   }
 
+  // Confirma el permiso administrativo consultando un endpoint protegido por el servidor.
+  useEffect(() => {
+    if (!isAuthenticated || !serverUrl) { setIsAdmin(false); return }
+    let cancelled = false
+    void (async () => {
+      try {
+        const token = await getAccessTokenSilently()
+        const response = await fetch(`${serverUrl}/api/admin/connections`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!cancelled) setIsAdmin(response.ok)
+      } catch { if (!cancelled) setIsAdmin(false) }
+    })()
+    return () => { cancelled = true }
+  }, [getAccessTokenSilently, hubStatus, isAuthenticated, serverUrl])
+
+  // Carga las partidas activas y las conexiones visibles para el administrador.
+  const refreshAdminData = async () => {
+    setAdminBusy(true); setAdminError(null)
+    try {
+      const [matches, connections] = await Promise.all([
+        apiRequest<AdminMatch[]>('/api/admin/matches/active'),
+        apiRequest<AdminConnection[]>('/api/admin/connections'),
+      ])
+      setAdminMatches(matches); setAdminConnections(connections)
+    } catch (loadError) { setAdminError(loadError instanceof Error ? loadError.message : 'No se pudieron cargar los datos administrativos.') }
+    finally { setAdminBusy(false) }
+  }
+
+  // Termina una partida activa y actualiza el panel administrativo.
+  const terminateAdminMatch = async (matchId: string) => {
+    const reason = window.prompt('Motivo para terminar la partida:')?.trim()
+    if (!reason) return
+    setAdminBusy(true); setAdminError(null)
+    try { await apiRequest(`/api/admin/matches/${matchId}/terminate`, 'POST', { reason }); await refreshAdminData() }
+    catch (actionError) { setAdminError(actionError instanceof Error ? actionError.message : 'No se pudo terminar la partida.') }
+    finally { setAdminBusy(false) }
+  }
+
+  // Suspende al usuario indicado y limpia los campos del formulario.
+  const suspendAdminUser = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setAdminError(null)
+    try {
+      await apiRequest(`/api/admin/users/${encodeURIComponent(suspendSubject)}/suspension`, 'PUT', { reason: suspendReason, expiresAt: null })
+      setSuspendSubject(''); setSuspendReason('')
+    } catch (actionError) { setAdminError(actionError instanceof Error ? actionError.message : 'No se pudo suspender al usuario.') }
+  }
+
   // Ejecuta una operación de sala y muestra cualquier error en la interfaz.
   const runRoomAction = async (action: () => Promise<void>) => {
     setRoomError(null)
@@ -305,6 +375,15 @@ function App() {
   const loadPublicRooms = () => runRoomAction(async () => {
     setPublicRooms(await apiRequest<Room[]>('/api/rooms'))
   })
+
+  // Carga la página actual del historial del usuario autenticado.
+  const loadHistory = async (page = 1) => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try { setHistory(await apiRequest<MatchHistory>(`/api/history?page=${page}&pageSize=4`)) }
+    catch (historyLoadError) { setHistoryError(historyLoadError instanceof Error ? historyLoadError.message : 'No se pudo cargar el historial.') }
+    finally { setHistoryLoading(false) }
+  }
 
   // Crea una sala con la visibilidad seleccionada.
   const createRoom = () => runRoomAction(async () => {
@@ -456,11 +535,11 @@ function App() {
   if (isAuthenticated && matchSnapshot) {
     const usedEnergy = Object.entries(planCounts).reduce((sum, [action, count]) => sum + count * (action === 'SpecialAttack' ? 3 : 1), 0)
     const remainingEnergy = matchSnapshot.you.energy - usedEnergy
-    const actions: { id: PlanAction; label: string; detail: string; disabled?: boolean }[] = [
-      { id: 'Attack', label: 'Ataque', detail: '5 de daño · crítico posible' },
-      { id: 'Block', label: 'Bloqueo', detail: `Cancela un ataque · ${Math.max(0, 5 - matchSnapshot.you.usedBlockades)} restantes`, disabled: matchSnapshot.you.usedBlockades + planCounts.Block >= 5 },
-      { id: 'Reserve', label: 'Reservar energía', detail: 'Guarda energía para la siguiente ronda' },
-      { id: 'SpecialAttack', label: 'Ataque especial', detail: '20 de daño · x3 de energía · un solo uso', disabled: matchSnapshot.roundNumber < 5 || matchSnapshot.you.hasUsedSpecialAttack || planCounts.SpecialAttack >= 1 },
+    const actions: { id: PlanAction; label: string; detail: string; image: string; disabled?: boolean }[] = [
+      { id: 'Attack', label: 'Ataque', detail: '5 de daño · crítico posible', image: '/assets/actions/attack.png' },
+      { id: 'Block', label: 'Bloqueo', detail: `Cancela un ataque · ${Math.max(0, 5 - matchSnapshot.you.usedBlockades)} restantes`, image: '/assets/actions/block.png', disabled: matchSnapshot.you.usedBlockades + planCounts.Block >= 5 },
+      { id: 'Reserve', label: 'Reservar energía', detail: 'Guarda energía para la siguiente ronda', image: '/assets/actions/saveEnergy.jpg' },
+      { id: 'SpecialAttack', label: 'Ataque especial', detail: '20 de daño · x3 de energía · un solo uso', image: '/assets/actions/special.jpg', disabled: matchSnapshot.roundNumber < 5 || matchSnapshot.you.hasUsedSpecialAttack || planCounts.SpecialAttack >= 1 },
     ]
     // Elegir la imagen del jugador y del oponente según si es anfitrión o invitado.
     const playerImage = matchSnapshot.you.isHost
@@ -500,7 +579,7 @@ function App() {
           <h1 id="match-result-title">{resultTitle}</h1>
           {resultDescription && <p className="match-result-description">{resultDescription}</p>}
           <img className="match-result-image" src={resultImage} alt={resultImageAlt} />
-          {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} · recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} · ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
+          {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} ··· recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} ··· ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
           <div className="lobby-return-wrap"><button className="text-button lobby-return" onClick={returnToLobby} aria-label="Volver al lobby" title="Volver al lobby"><span className="lobby-return-icon" aria-hidden="true">🏰</span></button></div>
         </section>
       </main>
@@ -526,8 +605,8 @@ function App() {
         <div className="fighter-card opponent-fighter"><div className="fighter-placeholder fighter-image"><img src={opponentImage} alt="" /></div><p className="fighter-name">{matchSnapshot.opponent.nickname ?? 'Rival'}</p><div className="fighter-health"><strong>{matchSnapshot.opponent.health}</strong><span>/ 50 salud</span></div><div className="health-track opponent-health"><span style={{ width: `${matchSnapshot.opponent.health * 2}%` }} /></div><span className="fighter-energy">Contrincante</span></div>
       </section>
       <section className="room-panel plan-panel"><div className="section-heading"><div><h2>Plan de ronda</h2><p className="supporting-text">Asigna toda tu energía. El rival no verá tus acciones.</p></div><strong className="energy-badge">{remainingEnergy} / {matchSnapshot.you.energy} energía</strong></div>
-        <div className="actions-bar">{actions.map((action) => <div className="action-row" key={action.id}><div><strong>{action.label}</strong><span>{action.detail}</span></div><div className="action-counter"><button aria-label={`Quitar ${action.label}`} onClick={() => changePlanAction(action.id, -1)} disabled={planPending || planCounts[action.id] === 0}>−</button><strong>{planCounts[action.id]}</strong><button aria-label={`Añadir ${action.label}`} onClick={() => changePlanAction(action.id, 1)} disabled={planPending || action.disabled || remainingEnergy < (action.id === 'SpecialAttack' ? 3 : 1)}>+</button></div></div>)}</div>
-        {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} · recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} · ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
+        <div className="actions-bar">{actions.map((action) => <div className="action-row" key={action.id}><div className="action-art" tabIndex={0} aria-label={`${action.label}: ${action.detail}`} title={`${action.label}: ${action.detail}`}><img src={action.image} alt="" /><div className="action-tooltip"><strong>{action.label}</strong><span>{action.detail}</span></div></div><div className="action-counter"><button aria-label={`Quitar ${action.label}`} onClick={() => changePlanAction(action.id, -1)} disabled={planPending || planCounts[action.id] === 0}>−</button><strong>{planCounts[action.id]}</strong><button aria-label={`Añadir ${action.label}`} onClick={() => changePlanAction(action.id, 1)} disabled={planPending || action.disabled || remainingEnergy < (action.id === 'SpecialAttack' ? 3 : 1)}>+</button></div></div>)}</div>
+        {roundResult && <div className="round-result"><strong>Resultado de la ronda {roundResult.roundNumber}</strong><span>Infligiste {roundResult.yourDamage} ··· recibiste {roundResult.opponentDamage}</span><span>Críticos: {roundResult.yourCriticalHits} ··· ataques tuyos bloqueados: {roundResult.yourAttacksBlocked}</span></div>}
         <button className="primary-button submit-plan-button" onClick={submitRoundPlan} disabled={remainingEnergy !== 0 || planPending || !hubConnection}>Enviar plan</button>
         {planPending && <p className="supporting-text plan-pending-message" role="status">Plan enviado. Esperando al rival…</p>}
         {matchError && <p className="error-message" role="alert">{matchError}</p>}
@@ -535,6 +614,16 @@ function App() {
       </section>
     </section></main>
   }
+
+  if (showAdmin && isAdmin) return <main className="auth-page admin-page"><section className="auth-card lobby-card admin-card">
+    <div className="section-heading"><h1>Administración</h1><button className="text-button" onClick={() => setShowAdmin(false)}>Volver al lobby</button></div>
+    <div className="section-heading admin-section-heading"><h2>Partidas activas</h2><button className="text-button" onClick={() => void refreshAdminData()} disabled={adminBusy}>Actualizar</button></div>
+    {adminMatches.length === 0 ? <p className="supporting-text">No hay partidas activas.</p> : <div className="admin-list">{adminMatches.map((match) => <article className="admin-entry" key={match.matchId}><div><strong>Ronda {match.roundNumber}</strong><span>{match.matchId}</span><span>Actividad: {new Date(match.lastActivityAt).toLocaleString()}</span></div><button className="abandon-match-button" disabled={adminBusy} onClick={() => void terminateAdminMatch(match.matchId)}>Terminar partida</button></article>)}</div>}
+    <div className="section-heading admin-section-heading"><h2>Conexiones activas</h2><span>{adminConnections.length}</span></div>
+    {adminConnections.length === 0 ? <p className="supporting-text">No hay conexiones activas.</p> : <div className="admin-list">{adminConnections.map((connection) => <article className="admin-entry" key={connection.connectionId}><div><strong>{connection.subject}</strong><span>Conectado: {new Date(connection.connectedAt).toLocaleString()}</span></div></article>)}</div>}
+    <section className="room-panel admin-suspend-panel"><h2>Suspender usuario</h2><form onSubmit={suspendAdminUser}><input value={suspendSubject} onChange={(event) => setSuspendSubject(event.target.value)} placeholder="Identificador sub del usuario" required /><input value={suspendReason} onChange={(event) => setSuspendReason(event.target.value)} placeholder="Motivo de la suspensión" maxLength={500} required /><button className="abandon-match-button" disabled={adminBusy}>Suspender permanentemente</button></form></section>
+    {adminError && <p className="error-message" role="alert">{adminError}</p>}
+  </section></main>
 
   if (!isAuthenticated) {
     return <main className="login-page">
@@ -550,7 +639,7 @@ function App() {
   return (
     <main className="auth-page">
       <section className="auth-card lobby-card">
-        <img className="lobby-banner" src="/banner.jpg" alt="Banner del juego" />
+        <img key={lobbyBanners[lobbyBannerIndex]} className="lobby-banner" src={lobbyBanners[lobbyBannerIndex]} alt="Escena de la taberna" />
         <p className="eyebrow">Gentlemen lobby</p>
         <div className="lobby-content">
             <p className="supporting-text">Sesión iniciada{user?.name ? ` como ${user.name}` : ''}</p>
@@ -607,6 +696,22 @@ function App() {
             </>}
             {roomMessage && <p className="success-message" role="status">{roomMessage}</p>}
             {roomError && <p className="error-message" role="alert">{roomError}</p>}
+            <section className="room-panel history-panel">
+              <div className="section-heading"><h2>Historial de partidas</h2><button className="text-button" onClick={() => { const opening = !historyOpen; setHistoryOpen(opening); if (opening) void loadHistory() }}>{historyOpen ? 'Ocultar' : 'Ver historial'}</button></div>
+              {historyOpen && <>
+                {historyLoading && <p className="supporting-text">Cargando historial…</p>}
+                {historyError && <p className="error-message" role="alert">{historyError}</p>}
+                {!historyLoading && !historyError && history?.items.length === 0 && <p className="supporting-text">Aún no tienes partidas registradas.</p>}
+                {!historyLoading && !historyError && history && history.items.length > 0 && <>
+                  <div className="history-list">{history.items.map((entry) => <article className="history-entry" key={entry.matchId}>
+                    <div><strong>{entry.opponentNickname || 'Rival'}</strong><span>{new Date(entry.completedAt ?? entry.createdAt).toLocaleString()}</span></div>
+                    <div className="history-entry-meta"><span className={`history-result result-${entry.result}`}>{entry.result === 'won' ? 'Victoria' : entry.result === 'lost' ? 'Derrota' : entry.result === 'draw' ? 'Empate' : 'En curso'}</span><span>Ronda {entry.roundNumber}</span></div>
+                  </article>)}</div>
+                  <div className="history-pagination"><button className="secondary-button" onClick={() => void loadHistory(history.page - 1)} disabled={history.page <= 1 || historyLoading}>Anterior</button><span>{(history.page - 1) * history.pageSize + 1}–{Math.min(history.page * history.pageSize, history.total)} de {history.total}</span><button className="secondary-button" onClick={() => void loadHistory(history.page + 1)} disabled={history.page * history.pageSize >= history.total || historyLoading}>Siguiente</button></div>
+                </>}
+              </>}
+            </section>
+            {isAdmin && <button className="secondary-button admin-entry-button" onClick={() => { setShowAdmin(true); void refreshAdminData() }}>Administración</button>}
             <button className="primary-button" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Cerrar sesión</button>
         </div>
       </section>
