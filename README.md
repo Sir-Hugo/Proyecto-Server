@@ -23,6 +23,7 @@ Servidor autoritativo para un juego por turnos de dos jugadores. Integra una API
 | `web-client` | Cliente React para Auth0, salas, partidas y recuperación. |
 | `tools/Game.Database` | Migrador explícito; el servidor no migra al arrancar. |
 | `tests` | Pruebas de dominio, servidor, PostgreSQL, REST y SignalR. |
+| `scripts/bot` | Bot local autónomo que juega una partida completa mediante REST y SignalR. |
 | `scripts/performance` | Clientes automatizados y mediciones locales de carga. |
 | `infra` | Bicep del ambiente y deployments aislados. |
 | `.github/workflows` | CI y CD manual protegido. |
@@ -76,7 +77,15 @@ npm ci
 npm run dev
 ```
 
-El repositorio no incluye un bot autónomo de juego. Las pruebas de integración y `scripts/performance` crean clientes automatizados para ejercitar partidas y concurrencia; no deben describirse como un bot entregable independiente.
+## Bot de prueba
+
+El bot local inicia dos jugadores autónomos contra el host real en memoria y un PostgreSQL 17 aislado. Usa JWT efímeros y no acepta una URL externa, por lo que no puede enviar tráfico accidental a producción:
+
+```powershell
+.\scripts\bot\run.ps1
+```
+
+La estrategia gasta toda la energía en ataques normales. El flujo crea y une la sala, marca readiness, configura nicknames, envía planes legales y verifica el historial al terminar. Consulte [`scripts/bot/README.md`](scripts/bot/README.md) para sus límites.
 
 ## Pruebas y validación
 
@@ -134,6 +143,6 @@ El método, resultados y límites están en [`docs/phase5a-performance-validatio
 - Canary, división de tráfico y drenado de conexiones no fueron demostrados.
 - La prueba local llegó a 20 partidas concurrentes, pero no localizó el punto de ruptura ni midió CPU/memoria por partida.
 - No existe comparación medida antes/después de una optimización.
-- No existe un bot autónomo de prueba.
+- El bot es una demostración local bot contra bot con Long Polling; no es una IA competitiva ni prueba WebSocket contra Azure.
 
 La rama de entrega aún no debe etiquetarse como `v1.0.0` hasta integrar y validar por CI el trabajo final del frontend.

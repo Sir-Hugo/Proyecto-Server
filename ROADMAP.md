@@ -10,6 +10,7 @@
 - CI con backend, frontend, PostgreSQL, contratos, imagen, Bicep, CodeQL y gitleaks.
 - OpenTelemetry en Application Insights y dos alertas operativas habilitadas.
 - Prueba local reproducible hasta 20 partidas concurrentes.
+- Bot local autónomo validado contra REST, SignalR y PostgreSQL reales mediante un host aislado.
 
 ## Pendiente antes de `v1.0.0`
 
@@ -25,6 +26,6 @@
 - CD preparado, pero no ejecutado desde GitHub Actions porque faltan Environments y federated credentials.
 - Canary, drenado de conexiones y rollback menor de cinco minutos no fueron demostrados.
 - No se midieron CPU/memoria por partida, punto de ruptura ni una mejora antes/después.
-- El repositorio no contiene un bot autónomo; los clientes automatizados están en pruebas y en `scripts/performance`.
+- El bot se valida localmente con Long Polling y tokens efímeros; no se probó como cliente WebSocket contra Azure.
 
 La matriz completa y las evidencias están en [`docs/release-readiness.md`](docs/release-readiness.md).

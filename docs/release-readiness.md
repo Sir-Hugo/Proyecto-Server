@@ -10,7 +10,7 @@ La auditoría se realizó contra `Proyecto2-Requirements.docx`, README, ROADMAP,
 | --- | --- | --- | --- |
 | Código completo del servidor | `src/Game.Domain`, `src/Game.Infrastructure`, `src/Game.Server` | Cumplido | Dominio autoritativo, REST, SignalR, persistencia, historial y administración. |
 | Cliente de prueba | `web-client`, `tests/Game.Postgres.Tests/HttpSignalRTests.cs` | Cumplido | Cliente React real y clientes de integración automatizados. |
-| Bot de prueba | `scripts/performance/Game.Performance` | Parcial | Automatiza clientes y partidas para carga, pero no existe un bot autónomo entregable. |
+| Bot de prueba | `scripts/bot` | Cumplido | Dos bots autónomos usan REST y SignalR reales, eligen planes legales y terminan una partida local sin intervención. Usa JWT efímeros y PostgreSQL aislado; no contacta producción. |
 | Infraestructura como código | `infra/*.bicep`, `infra/*.bicepparam` | Cumplido | Recursos y deployments aislados en Bicep; el despliegue real se ejecutó por bloques controlados. |
 | CI | `.github/workflows/ci.yml` | Cumplido | Build, 155 pruebas .NET, frontend, Docker, Bicep, contratos, dependencias, CodeQL y gitleaks. Run confirmado `43345298193`. |
 | CD | `.github/workflows/cd.yml`, `docs/phase6c-cd-release.md` | Parcial | Workflow manual protegido preparado; no se ejecutó porque faltan GitHub Environments y OIDC/RBAC. No hay despliegue automático a dev. |
