@@ -27,4 +27,4 @@ Este modelo resume los activos, límites de confianza, controles implementados y
 | Release defectuoso | Health checks, revisión inmutable, digests conservados y rollback documentado. | Canary, drenado de WebSockets y rollback menor de cinco minutos no fueron ensayados. |
 | Pérdida de disponibilidad | Liveness/readiness, métricas, trazas y alertas HTTP 5xx/sin réplica. | Una sola réplica mantiene un punto único de indisponibilidad; no se midió el punto de ruptura. |
 
-La evidencia detallada está en [`phase4a-security-validation.md`](phase4a-security-validation.md), [`phase2c-validation.md`](phase2c-validation.md), [`phase6c-cd-release.md`](phase6c-cd-release.md) y [`phase7b-observability.md`](phase7b-observability.md).
+Las pruebas automatizadas están en `tests/`; la infraestructura y las alertas están en `infra/`; los contratos se publican mediante OpenAPI y `docs/asyncapi.yaml`. La evidencia consolidada y los resultados operativos se incluyen en `Documentacion_Proyecto3.pdf`, entregado por separado fuera del repositorio.

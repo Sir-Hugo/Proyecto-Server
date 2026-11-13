@@ -1,4 +1,4 @@
-# Phase 5A local performance runner
+# Ejecutor local de rendimiento
 
 Run from the repository root:
 
@@ -6,6 +6,8 @@ Run from the repository root:
 .\scripts\performance\run.ps1
 ```
 
-The script selects a free loopback port, creates a temporary random PostgreSQL password outside the repository, starts an isolated PostgreSQL 17 Compose project, applies the real migrations, runs the .NET server in Release through `Microsoft.AspNetCore.TestHost`, writes individual and aggregate measurements, and removes the container, volume and temporary environment file in `finally`.
+El script selecciona un puerto loopback libre, genera una contraseña PostgreSQL temporal fuera del repositorio, inicia PostgreSQL 17 mediante un proyecto Compose aislado, aplica las migraciones reales y ejecuta el servidor Release con `Microsoft.AspNetCore.TestHost`. Al terminar elimina el contenedor, volumen y archivo de entorno temporal desde `finally`.
 
-The synthetic JWT issuer and signing key exist only inside the runner process. Production credentials, Auth0 and Azure are never contacted. Normal security limits remain enabled. SignalR uses Long Polling because TestServer does not expose a network WebSocket listener; this makes the run reproducible but means the numbers must not be extrapolated to Azure.
+El issuer JWT y la clave sintética existen únicamente dentro del proceso. El ejecutor no contacta credenciales de producción, Auth0 ni Azure. Los límites de seguridad permanecen habilitados. SignalR usa Long Polling porque TestServer no expone un listener WebSocket; los resultados no deben extrapolarse a Azure.
+
+Las muestras y agregados se escriben en `scripts/performance/results/phase5a-results.json`. El archivo se regenera en cada ejecución y está ignorado por Git.

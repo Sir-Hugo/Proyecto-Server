@@ -19,6 +19,7 @@
 [Rr]elease/
 [Aa]rtifacts/
 TestResults/
+/scripts/performance/results/*.json
 
 # Visual Studio / IDE user files
 .vs/
